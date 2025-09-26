@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ideas Business - Monthly Sales Targets & KPIs 2025-2026</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <meta name="description" content="Ideas Business Monthly Sales Targets and KPI Dashboard for 2025-2026">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } = Recharts;
+
+        const MonthlySalesTargets = () => {
+            const [view, setView] = useState('overview');
+
+            // Monthly data with revenue targets, ticket targets, and sponsor targets
+            const monthlyData = [
+                {
+                    month: 'Oct 2025',
+                    revenue: 259125,
+                    tickets: 142,
+                    sponsors: 9,
+                    activities: 'Ideas Fest tickets continue, Sponsor outreach',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8
+                    }
+                },
+                {
+                    month: 'Nov 2025',
+                    revenue: 518458,
+                    tickets: 597,
+                    sponsors: 9,
+                    activities: 'Ideas Community & Website launch',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8
+                    }
+                },
+                {
+                    month: 'Dec 2025',
+                    revenue: 710875,
+                    tickets: 597,
+                    sponsors: 64,
+                    activities: 'UK Startup Regional applications open',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55
+                    }
+                },
+                {
+                    month: 'Jan 2026',
+                    revenue: 778208,
+                    tickets: 747,
+                    sponsors: 68,
+                    activities: 'GBIA entries open, Ideas Tables begin',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBIA Sponsors': 4
+                    }
+                },
+                {
+                    month: 'Feb 2026',
+                    revenue: 1086708,
+                    tickets: 1205,
+                    sponsors: 71,
+                    activities: 'Multiple ticket sales launch',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'GBIA': 83
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBIA Sponsors': 4,
+                        'GBEA Sponsors': 2
+                    }
+                },
+                {
+                    month: 'Mar 2026',
+                    revenue: 1086708,
+                    tickets: 1205,
+                    sponsors: 71,
+                    activities: 'Peak sponsor acquisition period',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'GBIA': 83
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBIA Sponsors': 4,
+                        'GBEA Sponsors': 2
+                    }
+                },
+                {
+                    month: 'Apr 2026',
+                    revenue: 1086708,
+                    tickets: 1055,
+                    sponsors: 71,
+                    activities: 'GBIA event takes place',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'GBIA': 83
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBEA Sponsors': 2
+                    }
+                },
+                {
+                    month: 'May 2026',
+                    revenue: 1136541,
+                    tickets: 1188,
+                    sponsors: 78,
+                    activities: 'UK Startup Regional events',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'UK Startup National': 133
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBEA Sponsors': 2,
+                        'National Sponsors': 7
+                    }
+                },
+                {
+                    month: 'Jun 2026',
+                    revenue: 1136541,
+                    tickets: 1188,
+                    sponsors: 78,
+                    activities: 'Continue sales momentum',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'UK Startup National': 133
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBEA Sponsors': 2,
+                        'National Sponsors': 7
+                    }
+                },
+                {
+                    month: 'Jul 2026',
+                    revenue: 1969874,
+                    tickets: 1188,
+                    sponsors: 78,
+                    activities: 'UK Startup National finals, VC Collab begins',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'UK Startup National': 133
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBEA Sponsors': 2,
+                        'National Sponsors': 7
+                    }
+                },
+                {
+                    month: 'Aug 2026',
+                    revenue: 2172207,
+                    tickets: 1563,
+                    sponsors: 80,
+                    activities: 'GBEA tickets on sale, VC Collab continues',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'UK Startup National': 133,
+                        'GBEA': 375
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBEA Sponsors': 2,
+                        'National Sponsors': 7,
+                        'Headline Sponsors': 1
+                    }
+                },
+                {
+                    month: 'Sep 2026',
+                    revenue: 2600540,
+                    tickets: 2363,
+                    sponsors: 81,
+                    activities: 'Ideas Fest event, Fast Growth Index launch',
+                    ticketBreakdown: {
+                        'Ideas Fest': 142,
+                        'Community Members': 455,
+                        'Ideas Tables': 150,
+                        'UK Startup Regional': 375,
+                        'UK Startup National': 133,
+                        'GBEA': 375,
+                        'Fast Growth Index': 800
+                    },
+                    sponsorBreakdown: {
+                        'Stage Sponsors': 1,
+                        'Traders': 8,
+                        'Tabletop': 8,
+                        'Category Sponsors': 55,
+                        'GBEA Sponsors': 2,
+                        'National Sponsors': 7,
+                        'Headline Sponsors': 1
+                    }
+                }
+            ];
+
+            const totalAnnualRevenue = monthlyData.reduce((sum, month) => sum + month.revenue, 0);
+            const totalTickets = monthlyData.reduce((sum, month) => sum + month.tickets, 0);
+
+            const formatCurrency = (value) => `£${Math.round(value / 1000)}k`;
+            const formatCurrencyFull = (value) => `£${value.toLocaleString()}`;
+
+            const cumulativeData = monthlyData.map((data, index) => ({
+                ...data,
+                cumulative: monthlyData.slice(0, index + 1).reduce((sum, month) => sum + month.revenue, 0)
+            }));
+
+            const CustomTooltip = ({ active, payload, label }) => {
+                if (active && payload && payload.length) {
+                    return (
+                        <div className="bg-white p-3 border rounded shadow-lg">
+                            <p className="font-semibold">{label}</p>
+                            <p className="text-blue-600">
+                                {formatCurrencyFull(payload[0].value)}
+                            </p>
+                        </div>
+                    );
+                }
+                return null;
+            };
+
+            return (
+                <div className="w-full p-6 bg-gray-50 min-h-screen">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2">Ideas Business</h1>
+                            <h2 className="text-xl text-gray-600 mb-4">Monthly Sales Targets & KPIs (Oct 2025 - Sep 2026)</h2>
+                            
+                            <div className="flex space-x-4 mb-6 flex-wrap">
+                                <button
+                                    onClick={() => setView('overview')}
+                                    className={`px-4 py-2 rounded mb-2 ${view === 'overview' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                >
+                                    Revenue Overview
+                                </button>
+                                <button
+                                    onClick={() => setView('tickets')}
+                                    className={`px-4 py-2 rounded mb-2 ${view === 'tickets' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                >
+                                    Ticket Types
+                                </button>
+                                <button
+                                    onClick={() => setView('sponsors')}
+                                    className={`px-4 py-2 rounded mb-2 ${view === 'sponsors' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                >
+                                    Sponsor Targets
+                                </button>
+                                <button
+                                    onClick={() => setView('timeline')}
+                                    className={`px-4 py-2 rounded mb-2 ${view === 'timeline' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                >
+                                    Monthly Timeline
+                                </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                                <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold">Annual Revenue</h3>
+                                    <p className="text-2xl font-bold">{formatCurrencyFull(totalAnnualRevenue)}</p>
+                                </div>
+                                <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold">Total Tickets</h3>
+                                    <p className="text-2xl font-bold">{totalTickets.toLocaleString()}</p>
+                                    <p className="text-sm">Annual target</p>
+                                </div>
+                                <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold">Total Sponsors</h3>
+                                    <p className="text-2xl font-bold">515+</p>
+                                    <p className="text-sm">All categories</p>
+                                </div>
+                                <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold">Ideas Fest Status</h3>
+                                    <p className="text-lg font-bold">800 Sold</p>
+                                    <p className="text-sm">1,700 Remaining</p>
+                                </div>
+                                <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg">
+                                    <h3 className="text-lg font-semibold">Peak Month</h3>
+                                    <p className="text-lg font-bold">Sep 2026</p>
+                                    <p className="text-sm">{formatCurrency(Math.max(...monthlyData.map(d => d.revenue)))}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {view === 'overview' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4">Monthly Revenue Targets</h3>
+                                    <ResponsiveContainer width="100%" height={400}>
+                                        <BarChart data={monthlyData}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="month" angle={-45} textAnchor="end" height={80} />
+                                            <YAxis tickFormatter={formatCurrency} />
+                                            <Tooltip content={<CustomTooltip />} />
+                                            <Bar dataKey="revenue" fill="#8884d8" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4">Cumulative Revenue Progress</h3>
+                                    <ResponsiveContainer width="100%" height={400}>
+                                        <BarChart data={cumulativeData}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="month" angle={-45} textAnchor="end" height={80} />
+                                            <YAxis tickFormatter={formatCurrency} />
+                                            <Tooltip content={<CustomTooltip />} />
+                                            <Bar dataKey="cumulative" fill="#82ca9d" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'tickets' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4">Monthly Ticket Breakdown</h3>
+                                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                                        {monthlyData.map((data, index) => (
+                                            <div key={index} className="border-l-4 border-blue-500 pl-4 py-2">
+                                                <h4 className="font-semibold text-gray-800 mb-2">{data.month}</h4>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {Object.entries(data.ticketBreakdown).map(([type, count]) => (
+                                                        <div key={type} className="flex justify-between text-sm">
+                                                            <span className="text-gray-600">{type}:</span>
+                                                            <span className="font-semibold text-blue-600">{count.toLocaleString()}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                                    <div className="flex justify-between font-bold text-sm">
+                                                        <span>Total:</span>
+                                                        <span className="text-green-600">{data.tickets.toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4">Ticket Type Details</h3>
+                                    <div className="space-y-4">
+                                        <div className="border-l-4 border-red-500 pl-4">
+                                            <h4 className="font-semibold text-gray-800">Event Tickets</h4>
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                                <div>Ideas Fest: 2,500 tickets</div>
+                                                <div>GBEA: 1,500 tickets (£375 each)</div>
+                                                <div>UK Startup Regional: 1,500 tickets (£55 each)</div>
+                                                <div>Fast Growth Index: 800 tickets (£350 each)</div>
+                                                <div>UK Startup National: 400 tickets (£99 each)</div>
+                                                <div>GBIA: 250 tickets (£350 each)</div>
+                                                <div>Ideas Tables: 1,800 tickets (£75 each)</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="border-l-4 border-blue-500 pl-4">
+                                            <h4 className="font-semibold text-gray-800">Membership</h4>
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                                <div>Ideas Community: 5,000 members (£49/month)</div>
+                                                <div>Website Membership: Included in digital package</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'sponsors' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4">Monthly Sponsor Breakdown</h3>
+                                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                                        {monthlyData.map((data, index) => (
+                                            <div key={index} className="border-l-4 border-green-500 pl-4 py-2">
+                                                <h4 className="font-semibold text-gray-800 mb-2">{data.month}</h4>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {Object.entries(data.sponsorBreakdown).map(([type, count]) => (
+                                                        <div key={type} className="flex justify-between text-sm">
+                                                            <span className="text-gray-600">{type}:</span>
+                                                            <span className="font-semibold text-purple-600">{count}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-2 pt-2 border-t border-gray-200">
+                                                    <div className="flex justify-between font-bold text-sm">
+                                                        <span>Total:</span>
+                                                        <span className="text-green-600">{data.sponsors}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4">Sponsor Type Details</h3>
+                                    <div className="space-y-4">
+                                        <div className="border-l-4 border-red-500 pl-4">
+                                            <h4 className="font-semibold text-gray-800">Headline Sponsors</h4>
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                                <div>Ideas Fest Overall: £150k</div>
+                                                <div>Ideas Fest Main: £75k</div>
+                                                <div>GBEA: £50k</div>
+                                                <div>GBIA: £50k</div>
+                                                <div>Fast Growth Index: £150k</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="border-l-4 border-blue-500 pl-4">
+                                            <h4 className="font-semibold text-gray-800">Category Sponsors</h4>
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                                <div>UK Startup Regional: 220 x £3.5k each</div>
+                                                <div>UK Startup National: 22 x £5k each</div>
+                                                <div>GBEA Categories: 20 x £10k each</div>
+                                                <div>GBIA Categories: 13 x £10k each</div>
+                                                <div>Ideas Fest Stage: 10 x £25k each</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="border-l-4 border-green-500 pl-4">
+                                            <h4 className="font-semibold text-gray-800">Exhibition & Digital</h4>
+                                            <div className="text-sm text-gray-600 space-y-1">
+                                                <div>Ideas Fest Traders: 100 x £1,750 each</div>
+                                                <div>Ideas Fest Tabletop: 100 x £595 each</div>
+                                                <div>Ideas Community Partnerships: 10 x £10k each</div>
+                                                <div>Website Sponsorship: £100k</div>
+                                                <div>Advertorial: £125k</div>
+                                                <div>Research Sponsorship: £30k</div>
+                                                <div>Jobs Marketplace: £10k</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'timeline' && (
+                            <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                                <h3 className="text-xl font-bold mb-6">Monthly Timeline & Key Activities</h3>
+                                <div className="space-y-4">
+                                    {monthlyData.map((data, index) => (
+                                        <div key={index} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                                            <div className="bg-blue-500 text-white px-3 py-1 rounded text-sm font-semibold min-w-fit">
+                                                {data.month}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                                                    <div>
+                                                        <span className="font-semibold text-green-600">Revenue: </span>
+                                                        <span>{formatCurrencyFull(data.revenue)}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-semibold text-blue-600">Tickets: </span>
+                                                        <span>{data.tickets.toLocaleString()}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-semibold text-purple-600">Sponsors: </span>
+                                                        <span>{data.sponsors}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-sm text-gray-700">
+                                                    <strong>Key Activities:</strong> {data.activities}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+                            <h3 className="text-xl font-bold mb-4">Monthly KPI Summary</h3>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-auto text-sm">
+                                    <thead>
+                                        <tr className="bg-gray-100">
+                                            <th className="px-4 py-2 text-left">Month</th>
+                                            <th className="px-4 py-2 text-right">Revenue Target</th>
+                                            <th className="px-4 py-2 text-right">Ticket Types</th>
+                                            <th className="px-4 py-2 text-right">Sponsor Types</th>
+                                            <th className="px-4 py-2 text-right">Cumulative</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {monthlyData.map((data, index) => (
+                                            <tr key={index} className="border-b hover:bg-gray-50">
+                                                <td className="px-4 py-2 font-semibold">{data.month}</td>
+                                                <td className="px-4 py-2 text-right font-bold text-blue-600">
+                                                    {formatCurrencyFull(data.revenue)}
+                                                </td>
+                                                <td className="px-4 py-2 text-right text-green-600">
+                                                    <div className="text-xs">
+                                                        {Object.entries(data.ticketBreakdown).map(([type, count]) => (
+                                                            <div key={type}>{type}: {count.toLocaleString()}</div>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-2 text-right text-purple-600">
+                                                    <div className="text-xs">
+                                                        {Object.entries(data.sponsorBreakdown).map(([type, count]) => (
+                                                            <div key={type}>{type}: {count}</div>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-2 text-right text-gray-600">
+                                                    {formatCurrencyFull(cumulativeData[index].cumulative)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <footer className="text-center text-gray-500 text-sm mt-8 pb-4">
+                            <p>Ideas Business Dashboard • Updated {new Date().toLocaleDateString()}</p>
+                        </footer>
+                    </div>
+                </div>
+            );
+        };
+
+        const domContainer = document.querySelector('#root');
+        const root = ReactDOM.createRoot(domContainer);
+        root.render(React.createElement(MonthlySalesTargets));
+    </script>
+</body>
+</html>
