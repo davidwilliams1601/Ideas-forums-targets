@@ -31,7 +31,7 @@
             const [view, setView] = useState('overview');
             const [actuals, setActuals] = useState(() => {
                 const saved = localStorage.getItem('ideasForumsActuals');
-                return saved ? JSON.parse(saved) : {
+                const defaultActuals = {
                     monthlyRevenue: Array(12).fill(0),
                     ideasFest: { tickets: 800, revenue: 0 },
                     gbea: { tickets: 0, sponsors: 0, revenue: 0 },
@@ -44,6 +44,21 @@
                     ideasTables: { tickets: 0, revenue: 0 },
                     vcCollab: { revenue: 0 }
                 };
+                
+                try {
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        // Ensure monthlyRevenue exists and is an array
+                        if (!parsed.monthlyRevenue || !Array.isArray(parsed.monthlyRevenue)) {
+                            parsed.monthlyRevenue = Array(12).fill(0);
+                        }
+                        return parsed;
+                    }
+                } catch (e) {
+                    console.error('Error loading saved actuals:', e);
+                }
+                
+                return defaultActuals;
             });
 
             const revenueChartRef = useRef(null);
@@ -132,7 +147,7 @@
             ];
 
             const totalAnnualTarget = monthlyData.reduce((sum, month) => sum + month.revenue, 0);
-            const totalActualRevenue = actuals.monthlyRevenue.reduce((sum, val) => sum + val, 0);
+            const totalActualRevenue = (actuals.monthlyRevenue || []).reduce((sum, val) => sum + val, 0);
             const totalTickets = monthlyData.reduce((sum, month) => sum + month.tickets, 0);
 
             const formatCurrency = (value) => `£${Math.round(value / 1000)}k`;
@@ -142,12 +157,12 @@
             const cumulativeData = monthlyData.map((data, index) => ({
                 ...data,
                 cumulative: monthlyData.slice(0, index + 1).reduce((sum, month) => sum + month.revenue, 0),
-                actualCumulative: actuals.monthlyRevenue.slice(0, index + 1).reduce((sum, val) => sum + val, 0)
+                actualCumulative: (actuals.monthlyRevenue || []).slice(0, index + 1).reduce((sum, val) => sum + val, 0)
             }));
 
             const updateMonthlyActual = (monthIndex, value) => {
                 setActuals(prev => {
-                    const newMonthly = [...prev.monthlyRevenue];
+                    const newMonthly = [...(prev.monthlyRevenue || Array(12).fill(0))];
                     newMonthly[monthIndex] = parseFloat(value) || 0;
                     return { ...prev, monthlyRevenue: newMonthly };
                 });
@@ -179,7 +194,7 @@
                                         backgroundColor: 'rgba(59, 130, 246, 0.6)'
                                     }, {
                                         label: 'Actual',
-                                        data: actuals.monthlyRevenue,
+                                        data: actuals.monthlyRevenue || Array(12).fill(0),
                                         backgroundColor: 'rgba(34, 197, 94, 0.8)'
                                     }]
                                 },
@@ -345,7 +360,7 @@
                                             </label>
                                             <input
                                                 type="number"
-                                                value={actuals.monthlyRevenue[index] || 0}
+                                                value={(actuals.monthlyRevenue || [])[index] || 0}
                                                 onChange={(e) => updateMonthlyActual(index, e.target.value)}
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 placeholder="Enter amount"
@@ -569,7 +584,7 @@
                                     </thead>
                                     <tbody>
                                         {monthlyData.map((data, index) => {
-                                            const actual = actuals.monthlyRevenue[index] || 0;
+                                            const actual = (actuals.monthlyRevenue || [])[index] || 0;
                                             const progress = calculateProgress(actual, data.revenue);
                                             return (
                                                 <tr key={index} className="border-b hover:bg-gray-50 transition-colors duration-200">
