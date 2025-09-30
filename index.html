@@ -16,6 +16,9 @@
             height: 400px; 
             width: 100%;
         }
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
     </style>
 </head>
 <body>
@@ -25,151 +28,118 @@
         const { useState, useEffect, useRef } = React;
 
         const MonthlySalesTargets = () => {
-            console.log('🚀 Ideas Dashboard: Component loading...');
-            
             const [view, setView] = useState('overview');
+            const [actuals, setActuals] = useState(() => {
+                const saved = localStorage.getItem('ideasForumsActuals');
+                return saved ? JSON.parse(saved) : {
+                    ideasFest: { tickets: 800, revenue: 0 },
+                    gbea: { tickets: 0, sponsors: 0, revenue: 0 },
+                    gbia: { tickets: 0, sponsors: 0, revenue: 0 },
+                    ukStartupRegional: { tickets: 0, sponsors: 0, revenue: 0 },
+                    ukStartupNational: { tickets: 0, sponsors: 0, revenue: 0 },
+                    fastGrowthIndex: { tickets: 0, sponsors: 0, revenue: 0 },
+                    ideasCommunity: { members: 0, revenue: 0 },
+                    website: { revenue: 0 },
+                    ideasTables: { tickets: 0, revenue: 0 },
+                    vcCollab: { revenue: 0 }
+                };
+            });
+
             const revenueChartRef = useRef(null);
             const cumulativeChartRef = useRef(null);
             const revenueChartInstance = useRef(null);
             const cumulativeChartInstance = useRef(null);
 
-            console.log('📊 Ideas Dashboard: State initialized, current view:', view);
+            // Save actuals to localStorage whenever they change
+            useEffect(() => {
+                localStorage.setItem('ideasForumsActuals', JSON.stringify(actuals));
+            }, [actuals]);
 
-            // Monthly data
-            const monthlyData = [
-                {
-                    month: 'Oct 2025', revenue: 259125, tickets: 142, sponsors: 9,
-                    activities: 'Ideas Fest tickets continue, Sponsor outreach',
-                    ticketBreakdown: { 'Ideas Fest': 142 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8 }
-                },
-                {
-                    month: 'Nov 2025', revenue: 518458, tickets: 597, sponsors: 9,
-                    activities: 'Ideas Community & Website launch',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8 }
-                },
-                {
-                    month: 'Dec 2025', revenue: 710875, tickets: 597, sponsors: 64,
-                    activities: 'UK Startup Regional applications open',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55 }
-                },
-                {
-                    month: 'Jan 2026', revenue: 778208, tickets: 747, sponsors: 68,
-                    activities: 'GBIA entries open, Ideas Tables begin',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBIA Sponsors': 4 }
-                },
-                {
-                    month: 'Feb 2026', revenue: 1086708, tickets: 1205, sponsors: 71,
-                    activities: 'Multiple ticket sales launch',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'GBIA': 83 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBIA Sponsors': 4, 'GBEA Sponsors': 2 }
-                },
-                {
-                    month: 'Mar 2026', revenue: 1086708, tickets: 1205, sponsors: 71,
-                    activities: 'Peak sponsor acquisition period',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'GBIA': 83 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBIA Sponsors': 4, 'GBEA Sponsors': 2 }
-                },
-                {
-                    month: 'Apr 2026', revenue: 1086708, tickets: 1055, sponsors: 71,
-                    activities: 'GBIA event takes place',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'GBIA': 83 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBEA Sponsors': 2 }
-                },
-                {
-                    month: 'May 2026', revenue: 1136541, tickets: 1188, sponsors: 78,
-                    activities: 'UK Startup Regional events',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'UK Startup National': 133 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBEA Sponsors': 2, 'National Sponsors': 7 }
-                },
-                {
-                    month: 'Jun 2026', revenue: 1136541, tickets: 1188, sponsors: 78,
-                    activities: 'Continue sales momentum',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'UK Startup National': 133 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBEA Sponsors': 2, 'National Sponsors': 7 }
-                },
-                {
-                    month: 'Jul 2026', revenue: 1969874, tickets: 1188, sponsors: 78,
-                    activities: 'UK Startup National finals, VC Collab begins',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'UK Startup National': 133 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBEA Sponsors': 2, 'National Sponsors': 7 }
-                },
-                {
-                    month: 'Aug 2026', revenue: 2172207, tickets: 1563, sponsors: 80,
-                    activities: 'GBEA tickets on sale, VC Collab continues',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'UK Startup National': 133, 'GBEA': 375 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBEA Sponsors': 2, 'National Sponsors': 7, 'Headline Sponsors': 1 }
-                },
-                {
-                    month: 'Sep 2026', revenue: 2600540, tickets: 2363, sponsors: 81,
-                    activities: 'Ideas Fest event, Fast Growth Index launch',
-                    ticketBreakdown: { 'Ideas Fest': 142, 'Community Members': 455, 'Ideas Tables': 150, 'UK Startup Regional': 375, 'UK Startup National': 133, 'GBEA': 375, 'Fast Growth Index': 800 },
-                    sponsorBreakdown: { 'Stage Sponsors': 1, 'Traders': 8, 'Tabletop': 8, 'Category Sponsors': 55, 'GBEA Sponsors': 2, 'National Sponsors': 7, 'Headline Sponsors': 1 }
-                }
-            ];
+            // Targets with updated regional sponsorship value
+            const targets = {
+                ideasFest: { tickets: 2500, revenue: 609500, sponsors: { stage: 10, traders: 100, tabletop: 100 } },
+                gbea: { tickets: 1500, revenue: 812500, sponsors: { headline: 1, category: 20 } },
+                gbia: { tickets: 250, revenue: 267500, sponsors: { headline: 1, category: 13 } },
+                ukStartupRegional: { tickets: 1500, revenue: 1511500, sponsors: { category: 220 } }, // Updated: 220 × £1,950 = £429,000
+                ukStartupNational: { tickets: 400, revenue: 149600, sponsors: { category: 22 } },
+                fastGrowthIndex: { tickets: 800, revenue: 430000, sponsors: { headline: 1 } },
+                ideasCommunity: { members: 5000, revenue: 3040000 },
+                website: { revenue: 295000 },
+                ideasTables: { tickets: 1800, revenue: 135000 },
+                vcCollab: { revenue: 2500000 }
+            };
 
-            const totalAnnualRevenue = monthlyData.reduce((sum, month) => sum + month.revenue, 0);
-            const totalTickets = monthlyData.reduce((sum, month) => sum + month.tickets, 0);
+            const totalTargetRevenue = Object.values(targets).reduce((sum, t) => sum + t.revenue, 0);
+            const totalActualRevenue = Object.values(actuals).reduce((sum, a) => sum + (a.revenue || 0), 0);
+            const totalTargetTickets = targets.ideasFest.tickets + targets.gbea.tickets + targets.gbia.tickets + 
+                                       targets.ukStartupRegional.tickets + targets.ukStartupNational.tickets + 
+                                       targets.fastGrowthIndex.tickets + targets.ideasTables.tickets + targets.ideasCommunity.members;
 
             const formatCurrency = (value) => `£${Math.round(value / 1000)}k`;
             const formatCurrencyFull = (value) => `£${value.toLocaleString()}`;
+            const calculateProgress = (actual, target) => Math.min(100, Math.round((actual / target) * 100));
 
-            const cumulativeData = monthlyData.map((data, index) => ({
-                ...data,
-                cumulative: monthlyData.slice(0, index + 1).reduce((sum, month) => sum + month.revenue, 0)
-            }));
+            const updateActual = (event, key, field) => {
+                const value = parseFloat(event.target.value) || 0;
+                setActuals(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], [field]: value }
+                }));
+            };
 
-            // Initialize charts when overview is selected
+            // Initialize charts
             useEffect(() => {
-                console.log('🎯 Ideas Dashboard: View changed to:', view);
-                
                 if (view === 'overview') {
-                    console.log('📈 Ideas Dashboard: Initializing charts...');
-                    
-                    // Destroy existing charts
-                    if (revenueChartInstance.current) {
-                        revenueChartInstance.current.destroy();
-                        console.log('🗑️ Ideas Dashboard: Destroyed existing revenue chart');
-                    }
-                    if (cumulativeChartInstance.current) {
-                        cumulativeChartInstance.current.destroy();
-                        console.log('🗑️ Ideas Dashboard: Destroyed existing cumulative chart');
-                    }
+                    if (revenueChartInstance.current) revenueChartInstance.current.destroy();
+                    if (cumulativeChartInstance.current) cumulativeChartInstance.current.destroy();
 
-                    // Create new charts
                     setTimeout(() => {
-                        console.log('⏱️ Ideas Dashboard: Creating charts after timeout...');
-                        
                         if (revenueChartRef.current) {
-                            console.log('📊 Ideas Dashboard: Creating revenue chart...');
                             const ctx = revenueChartRef.current.getContext('2d');
                             revenueChartInstance.current = new Chart(ctx, {
                                 type: 'bar',
                                 data: {
-                                    labels: monthlyData.map(d => d.month),
+                                    labels: ['Ideas Fest', 'GBEA', 'UK Regional', 'Ideas Community', 'VC Collab', 'FGI', 'Website', 'GBIA', 'UK National', 'Ideas Tables'],
                                     datasets: [{
-                                        label: 'Monthly Revenue',
-                                        data: monthlyData.map(d => d.revenue),
-                                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-                                        borderColor: 'rgb(59, 130, 246)',
-                                        borderWidth: 1,
-                                        borderRadius: 4,
-                                        borderSkipped: false
+                                        label: 'Target',
+                                        data: [
+                                            targets.ideasFest.revenue,
+                                            targets.gbea.revenue,
+                                            targets.ukStartupRegional.revenue,
+                                            targets.ideasCommunity.revenue,
+                                            targets.vcCollab.revenue,
+                                            targets.fastGrowthIndex.revenue,
+                                            targets.website.revenue,
+                                            targets.gbia.revenue,
+                                            targets.ukStartupNational.revenue,
+                                            targets.ideasTables.revenue
+                                        ],
+                                        backgroundColor: 'rgba(59, 130, 246, 0.6)'
+                                    }, {
+                                        label: 'Actual',
+                                        data: [
+                                            actuals.ideasFest.revenue,
+                                            actuals.gbea.revenue,
+                                            actuals.ukStartupRegional.revenue,
+                                            actuals.ideasCommunity.revenue,
+                                            actuals.vcCollab.revenue,
+                                            actuals.fastGrowthIndex.revenue,
+                                            actuals.website.revenue,
+                                            actuals.gbia.revenue,
+                                            actuals.ukStartupNational.revenue,
+                                            actuals.ideasTables.revenue
+                                        ],
+                                        backgroundColor: 'rgba(34, 197, 94, 0.8)'
                                     }]
                                 },
                                 options: {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: { display: false },
                                         tooltip: {
-                                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
                                             callbacks: {
                                                 label: function(context) {
-                                                    return 'Revenue: ' + formatCurrencyFull(context.parsed.y);
+                                                    return context.dataset.label + ': ' + formatCurrencyFull(context.parsed.y);
                                                 }
                                             }
                                         }
@@ -184,332 +154,306 @@
                                             }
                                         },
                                         x: {
-                                            ticks: { maxRotation: 45 }
+                                            ticks: { maxRotation: 45, minRotation: 45 }
                                         }
                                     }
                                 }
                             });
-                            console.log('✅ Ideas Dashboard: Revenue chart created successfully!');
                         }
 
                         if (cumulativeChartRef.current) {
-                            console.log('📈 Ideas Dashboard: Creating cumulative chart...');
                             const ctx = cumulativeChartRef.current.getContext('2d');
+                            const progressPercent = (totalActualRevenue / totalTargetRevenue) * 100;
+                            
                             cumulativeChartInstance.current = new Chart(ctx, {
-                                type: 'line',
+                                type: 'doughnut',
                                 data: {
-                                    labels: cumulativeData.map(d => d.month),
+                                    labels: ['Achieved', 'Remaining'],
                                     datasets: [{
-                                        label: 'Cumulative Revenue',
-                                        data: cumulativeData.map(d => d.cumulative),
-                                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                                        borderColor: 'rgb(34, 197, 94)',
-                                        borderWidth: 3,
-                                        fill: true,
-                                        tension: 0.4,
-                                        pointBackgroundColor: 'rgb(34, 197, 94)',
-                                        pointBorderColor: 'white',
-                                        pointBorderWidth: 2,
-                                        pointRadius: 5
+                                        data: [totalActualRevenue, Math.max(0, totalTargetRevenue - totalActualRevenue)],
+                                        backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(229, 231, 235, 0.5)'],
+                                        borderWidth: 0
                                     }]
                                 },
                                 options: {
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     plugins: {
-                                        legend: { display: false },
+                                        legend: { position: 'bottom' },
                                         tooltip: {
-                                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
                                             callbacks: {
                                                 label: function(context) {
-                                                    return 'Cumulative: ' + formatCurrencyFull(context.parsed.y);
+                                                    return context.label + ': ' + formatCurrencyFull(context.parsed);
                                                 }
                                             }
-                                        }
-                                    },
-                                    scales: {
-                                        y: {
-                                            beginAtZero: true,
-                                            ticks: {
-                                                callback: function(value) {
-                                                    return formatCurrency(value);
-                                                }
-                                            }
-                                        },
-                                        x: {
-                                            ticks: { maxRotation: 45 }
                                         }
                                     }
                                 }
                             });
-                            console.log('✅ Ideas Dashboard: Cumulative chart created successfully!');
                         }
-                        
-                        console.log('🎉 Ideas Dashboard: All charts initialized!');
                     }, 100);
                 }
-            }, [view]);
+            }, [view, actuals]);
 
-            console.log('🏗️ Ideas Dashboard: Rendering component with total revenue:', formatCurrencyFull(totalAnnualRevenue));
+            return (
+                <div className="w-full p-6 bg-gray-50 min-h-screen">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2">Ideas Forums</h1>
+                            <h2 className="text-xl text-gray-600 mb-4">Sales Targets & Performance Tracking (2025-2026)</h2>
+                            
+                            <div className="flex space-x-4 mb-6 flex-wrap">
+                                <button
+                                    onClick={() => setView('overview')}
+                                    className={`px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'overview' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`}
+                                >
+                                    Overview
+                                </button>
+                                <button
+                                    onClick={() => setView('actuals')}
+                                    className={`px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'actuals' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`}
+                                >
+                                    Enter Actuals
+                                </button>
+                                <button
+                                    onClick={() => setView('progress')}
+                                    className={`px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'progress' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`}
+                                >
+                                    Progress Tracking
+                                </button>
+                                <button
+                                    onClick={() => setView('targets')}
+                                    className={`px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'targets' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`}
+                                >
+                                    Target Details
+                                </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200">
+                                    <h3 className="text-lg font-semibold">Annual Target</h3>
+                                    <p className="text-2xl font-bold">{formatCurrencyFull(totalTargetRevenue)}</p>
+                                    <p className="text-sm opacity-90">Total revenue goal</p>
+                                </div>
+                                <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200">
+                                    <h3 className="text-lg font-semibold">Actual Revenue</h3>
+                                    <p className="text-2xl font-bold">{formatCurrencyFull(totalActualRevenue)}</p>
+                                    <p className="text-sm opacity-90">{calculateProgress(totalActualRevenue, totalTargetRevenue)}% of target</p>
+                                </div>
+                                <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200">
+                                    <h3 className="text-lg font-semibold">Variance</h3>
+                                    <p className="text-2xl font-bold">{formatCurrencyFull(totalActualRevenue - totalTargetRevenue)}</p>
+                                    <p className="text-sm opacity-90">{totalActualRevenue >= totalTargetRevenue ? 'Over target' : 'Below target'}</p>
+                                </div>
+                                <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200">
+                                    <h3 className="text-lg font-semibold">Ideas Fest</h3>
+                                    <p className="text-lg font-bold">{actuals.ideasFest.tickets} Sold</p>
+                                    <p className="text-sm opacity-90">{targets.ideasFest.tickets - actuals.ideasFest.tickets} Remaining</p>
+                                </div>
+                            </div>
+                        </div>
 
-            return React.createElement('div', { className: "w-full p-6 bg-gray-50 min-h-screen" },
-                React.createElement('div', { className: "max-w-7xl mx-auto" },
-                    React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6 mb-6" },
-                        React.createElement('h1', { className: "text-3xl font-bold text-gray-800 mb-2" }, "Ideas Business"),
-                        React.createElement('h2', { className: "text-xl text-gray-600 mb-4" }, "Monthly Sales Targets & KPIs (Oct 2025 - Sep 2026)"),
-                        
-                        React.createElement('div', { className: "flex space-x-4 mb-6 flex-wrap" },
-                            React.createElement('button', {
-                                onClick: () => setView('overview'),
-                                className: `px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'overview' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`
-                            }, "Revenue Overview"),
-                            React.createElement('button', {
-                                onClick: () => setView('tickets'),
-                                className: `px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'tickets' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`
-                            }, "Ticket Types"),
-                            React.createElement('button', {
-                                onClick: () => setView('sponsors'),
-                                className: `px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'sponsors' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`
-                            }, "Sponsor Targets"),
-                            React.createElement('button', {
-                                onClick: () => setView('timeline'),
-                                className: `px-4 py-2 rounded mb-2 transition-all duration-200 ${view === 'timeline' ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-200 hover:bg-gray-300'}`
-                            }, "Monthly Timeline")
-                        ),
-                        
-                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-5 gap-4 mb-6" },
-                            React.createElement('div', { className: "bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200" },
-                                React.createElement('h3', { className: "text-lg font-semibold" }, "Annual Revenue"),
-                                React.createElement('p', { className: "text-2xl font-bold" }, formatCurrencyFull(totalAnnualRevenue))
-                            ),
-                            React.createElement('div', { className: "bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200" },
-                                React.createElement('h3', { className: "text-lg font-semibold" }, "Total Tickets"),
-                                React.createElement('p', { className: "text-2xl font-bold" }, totalTickets.toLocaleString()),
-                                React.createElement('p', { className: "text-sm opacity-90" }, "Annual target")
-                            ),
-                            React.createElement('div', { className: "bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200" },
-                                React.createElement('h3', { className: "text-lg font-semibold" }, "Total Sponsors"),
-                                React.createElement('p', { className: "text-2xl font-bold" }, "515+"),
-                                React.createElement('p', { className: "text-sm opacity-90" }, "All categories")
-                            ),
-                            React.createElement('div', { className: "bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200" },
-                                React.createElement('h3', { className: "text-lg font-semibold" }, "Ideas Fest Status"),
-                                React.createElement('p', { className: "text-lg font-bold" }, "800 Sold"),
-                                React.createElement('p', { className: "text-sm opacity-90" }, "1,700 Remaining")
-                            ),
-                            React.createElement('div', { className: "bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-200" },
-                                React.createElement('h3', { className: "text-lg font-semibold" }, "Peak Month"),
-                                React.createElement('p', { className: "text-lg font-bold" }, "Sep 2026"),
-                                React.createElement('p', { className: "text-sm opacity-90" }, formatCurrency(Math.max(...monthlyData.map(d => d.revenue))))
-                            )
-                        )
-                    ),
+                        {view === 'overview' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4 text-gray-800">Target vs Actual by Stream</h3>
+                                    <div className="chart-container">
+                                        <canvas ref={revenueChartRef}></canvas>
+                                    </div>
+                                </div>
 
-                    view === 'overview' && React.createElement('div', { className: "grid grid-cols-1 lg:grid-cols-2 gap-6" },
-                        React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6" },
-                            React.createElement('h3', { className: "text-xl font-bold mb-4 text-gray-800" }, "Monthly Revenue Targets"),
-                            React.createElement('div', { className: "chart-container" },
-                                React.createElement('canvas', { ref: revenueChartRef })
-                            )
-                        ),
-                        React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6" },
-                            React.createElement('h3', { className: "text-xl font-bold mb-4 text-gray-800" }, "Cumulative Revenue Progress"),
-                            React.createElement('div', { className: "chart-container" },
-                                React.createElement('canvas', { ref: cumulativeChartRef })
-                            )
-                        )
-                    ),
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4 text-gray-800">Overall Progress</h3>
+                                    <div className="chart-container">
+                                        <canvas ref={cumulativeChartRef}></canvas>
+                                    </div>
+                                    <div className="text-center mt-4">
+                                        <p className="text-3xl font-bold text-green-600">
+                                            {calculateProgress(totalActualRevenue, totalTargetRevenue)}%
+                                        </p>
+                                        <p className="text-gray-600">of annual target achieved</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                    view === 'tickets' && React.createElement('div', { className: "grid grid-cols-1 lg:grid-cols-2 gap-6" },
-                        React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6" },
-                            React.createElement('h3', { className: "text-xl font-bold mb-4 text-gray-800" }, "Monthly Ticket Breakdown"),
-                            React.createElement('div', { className: "space-y-4 max-h-96 overflow-y-auto" },
-                                monthlyData.map((data, index) =>
-                                    React.createElement('div', { key: index, className: "border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded-r-lg" },
-                                        React.createElement('h4', { className: "font-semibold text-gray-800 mb-2" }, data.month),
-                                        React.createElement('div', { className: "grid grid-cols-1 gap-2" },
-                                            Object.entries(data.ticketBreakdown).map(([type, count]) =>
-                                                React.createElement('div', { key: type, className: "flex justify-between text-sm" },
-                                                    React.createElement('span', { className: "text-gray-700" }, type + ":"),
-                                                    React.createElement('span', { className: "font-semibold text-blue-600" }, count.toLocaleString())
-                                                )
-                                            )
-                                        ),
-                                        React.createElement('div', { className: "mt-2 pt-2 border-t border-blue-200" },
-                                            React.createElement('div', { className: "flex justify-between font-bold text-sm" },
-                                                React.createElement('span', { className: "text-gray-700" }, "Total:"),
-                                                React.createElement('span', { className: "text-green-600" }, data.tickets.toLocaleString())
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        ),
-                        React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6" },
-                            React.createElement('h3', { className: "text-xl font-bold mb-4 text-gray-800" }, "Ticket Type Details"),
-                            React.createElement('div', { className: "space-y-4" },
-                                React.createElement('div', { className: "border-l-4 border-red-500 pl-4 bg-red-50 p-3 rounded-r-lg" },
-                                    React.createElement('h4', { className: "font-semibold text-gray-800" }, "Event Tickets"),
-                                    React.createElement('div', { className: "text-sm text-gray-700 space-y-1" },
-                                        React.createElement('div', null, "Ideas Fest: 2,500 tickets"),
-                                        React.createElement('div', null, "GBEA: 1,500 tickets (£375 each)"),
-                                        React.createElement('div', null, "UK Startup Regional: 1,500 tickets (£55 each)"),
-                                        React.createElement('div', null, "Fast Growth Index: 800 tickets (£350 each)"),
-                                        React.createElement('div', null, "UK Startup National: 400 tickets (£99 each)"),
-                                        React.createElement('div', null, "GBIA: 250 tickets (£350 each)"),
-                                        React.createElement('div', null, "Ideas Tables: 1,800 tickets (£75 each)")
-                                    )
-                                ),
-                                React.createElement('div', { className: "border-l-4 border-blue-500 pl-4 bg-blue-50 p-3 rounded-r-lg" },
-                                    React.createElement('h4', { className: "font-semibold text-gray-800" }, "Membership"),
-                                    React.createElement('div', { className: "text-sm text-gray-700 space-y-1" },
-                                        React.createElement('div', null, "Ideas Community: 5,000 members (£49/month)")
-                                    )
-                                )
-                            )
-                        )
-                    ),
+                        {view === 'actuals' && (
+                            <div className="bg-white rounded-lg shadow-lg p-6">
+                                <h3 className="text-xl font-bold mb-6 text-gray-800">Enter Actual Figures</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {[
+                                        { key: 'ideasFest', name: 'Ideas Fest', fields: ['tickets', 'revenue'] },
+                                        { key: 'gbea', name: 'GBEA', fields: ['tickets', 'sponsors', 'revenue'] },
+                                        { key: 'gbia', name: 'GBIA', fields: ['tickets', 'sponsors', 'revenue'] },
+                                        { key: 'ukStartupRegional', name: 'UK Startup Regional', fields: ['tickets', 'sponsors', 'revenue'] },
+                                        { key: 'ukStartupNational', name: 'UK Startup National', fields: ['tickets', 'sponsors', 'revenue'] },
+                                        { key: 'fastGrowthIndex', name: 'Fast Growth Index', fields: ['tickets', 'sponsors', 'revenue'] },
+                                        { key: 'ideasCommunity', name: 'Ideas Community', fields: ['members', 'revenue'] },
+                                        { key: 'website', name: 'Website', fields: ['revenue'] },
+                                        { key: 'ideasTables', name: 'Ideas Tables', fields: ['tickets', 'revenue'] },
+                                        { key: 'vcCollab', name: 'VC Collab', fields: ['revenue'] }
+                                    ].map(item => (
+                                        <div key={item.key} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                            <h4 className="font-semibold text-gray-800 mb-3">{item.name}</h4>
+                                            {item.fields.map(field => (
+                                                <div key={field} className="mb-3">
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1 capitalize">
+                                                        {field}:
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        value={actuals[item.key][field] || 0}
+                                                        onChange={(e) => updateActual(e, item.key, field)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                        placeholder={`Enter ${field}`}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-sm text-blue-800">
+                                        💡 <strong>Tip:</strong> Your data is automatically saved in your browser. Return anytime to update your figures!
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
-                    view === 'sponsors' && React.createElement('div', { className: "grid grid-cols-1 lg:grid-cols-2 gap-6" },
-                        React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6" },
-                            React.createElement('h3', { className: "text-xl font-bold mb-4 text-gray-800" }, "Monthly Sponsor Breakdown"),
-                            React.createElement('div', { className: "space-y-4 max-h-96 overflow-y-auto" },
-                                monthlyData.map((data, index) =>
-                                    React.createElement('div', { key: index, className: "border-l-4 border-green-500 pl-4 py-2 bg-green-50 rounded-r-lg" },
-                                        React.createElement('h4', { className: "font-semibold text-gray-800 mb-2" }, data.month),
-                                        React.createElement('div', { className: "grid grid-cols-1 gap-2" },
-                                            Object.entries(data.sponsorBreakdown).map(([type, count]) =>
-                                                React.createElement('div', { key: type, className: "flex justify-between text-sm" },
-                                                    React.createElement('span', { className: "text-gray-700" }, type + ":"),
-                                                    React.createElement('span', { className: "font-semibold text-purple-600" }, count)
-                                                )
-                                            )
-                                        ),
-                                        React.createElement('div', { className: "mt-2 pt-2 border-t border-green-200" },
-                                            React.createElement('div', { className: "flex justify-between font-bold text-sm" },
-                                                React.createElement('span', { className: "text-gray-700" }, "Total:"),
-                                                React.createElement('span', { className: "text-green-600" }, data.sponsors)
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        ),
-                        React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6" },
-                            React.createElement('h3', { className: "text-xl font-bold mb-4 text-gray-800" }, "Sponsor Type Details"),
-                            React.createElement('div', { className: "space-y-4" },
-                                React.createElement('div', { className: "border-l-4 border-red-500 pl-4 bg-red-50 p-3 rounded-r-lg" },
-                                    React.createElement('h4', { className: "font-semibold text-gray-800" }, "Headline Sponsors"),
-                                    React.createElement('div', { className: "text-sm text-gray-700 space-y-1" },
-                                        React.createElement('div', null, "Ideas Fest Overall: £150k"),
-                                        React.createElement('div', null, "Ideas Fest Main: £75k"),
-                                        React.createElement('div', null, "GBEA: £50k"),
-                                        React.createElement('div', null, "GBIA: £50k"),
-                                        React.createElement('div', null, "Fast Growth Index: £150k")
-                                    )
-                                ),
-                                React.createElement('div', { className: "border-l-4 border-blue-500 pl-4 bg-blue-50 p-3 rounded-r-lg" },
-                                    React.createElement('h4', { className: "font-semibold text-gray-800" }, "Category Sponsors"),
-                                    React.createElement('div', { className: "text-sm text-gray-700 space-y-1" },
-                                        React.createElement('div', null, "UK Startup Regional: 220 × £3.5k each"),
-                                        React.createElement('div', null, "UK Startup National: 22 × £5k each"),
-                                        React.createElement('div', null, "GBEA Categories: 20 × £10k each"),
-                                        React.createElement('div', null, "GBIA Categories: 13 × £10k each"),
-                                        React.createElement('div', null, "Ideas Fest Stage: 10 × £25k each")
-                                    )
-                                ),
-                                React.createElement('div', { className: "border-l-4 border-green-500 pl-4 bg-green-50 p-3 rounded-r-lg" },
-                                    React.createElement('h4', { className: "font-semibold text-gray-800" }, "Exhibition & Digital"),
-                                    React.createElement('div', { className: "text-sm text-gray-700 space-y-1" },
-                                        React.createElement('div', null, "Ideas Fest Traders: 100 × £1,750 each"),
-                                        React.createElement('div', null, "Ideas Fest Tabletop: 100 × £595 each"),
-                                        React.createElement('div', null, "Ideas Community: 10 × £10k each"),
-                                        React.createElement('div', null, "Website Sponsorship: £100k"),
-                                        React.createElement('div', null, "Advertorial: £125k"),
-                                        React.createElement('div', null, "Research Sponsorship: £30k"),
-                                        React.createElement('div', null, "Jobs Marketplace: £10k")
-                                    )
-                                )
-                            )
-                        )
-                    ),
+                        {view === 'progress' && (
+                            <div className="bg-white rounded-lg shadow-lg p-6">
+                                <h3 className="text-xl font-bold mb-6 text-gray-800">Progress by Revenue Stream</h3>
+                                <div className="space-y-6">
+                                    {[
+                                        { key: 'ideasFest', name: 'Ideas Fest', target: targets.ideasFest.revenue, actual: actuals.ideasFest.revenue },
+                                        { key: 'gbea', name: 'GBEA', target: targets.gbea.revenue, actual: actuals.gbea.revenue },
+                                        { key: 'ukStartupRegional', name: 'UK Startup Regional', target: targets.ukStartupRegional.revenue, actual: actuals.ukStartupRegional.revenue },
+                                        { key: 'ideasCommunity', name: 'Ideas Community', target: targets.ideasCommunity.revenue, actual: actuals.ideasCommunity.revenue },
+                                        { key: 'vcCollab', name: 'VC Collab', target: targets.vcCollab.revenue, actual: actuals.vcCollab.revenue },
+                                        { key: 'fastGrowthIndex', name: 'Fast Growth Index', target: targets.fastGrowthIndex.revenue, actual: actuals.fastGrowthIndex.revenue },
+                                        { key: 'website', name: 'Website', target: targets.website.revenue, actual: actuals.website.revenue },
+                                        { key: 'gbia', name: 'GBIA', target: targets.gbia.revenue, actual: actuals.gbia.revenue },
+                                        { key: 'ukStartupNational', name: 'UK Startup National', target: targets.ukStartupNational.revenue, actual: actuals.ukStartupNational.revenue },
+                                        { key: 'ideasTables', name: 'Ideas Tables', target: targets.ideasTables.revenue, actual: actuals.ideasTables.revenue }
+                                    ].map(item => {
+                                        const progress = calculateProgress(item.actual, item.target);
+                                        const variance = item.actual - item.target;
+                                        return (
+                                            <div key={item.key} className="border-b border-gray-200 pb-4">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h4 className="font-semibold text-gray-800">{item.name}</h4>
+                                                    <div className="text-right">
+                                                        <p className="font-bold text-lg">{progress}%</p>
+                                                        <p className="text-sm text-gray-600">{formatCurrencyFull(item.actual)} / {formatCurrencyFull(item.target)}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                                                    <div 
+                                                        className="progress-bar h-4 rounded-full"
+                                                        style={{ 
+                                                            width: `${progress}%`,
+                                                            backgroundColor: progress >= 100 ? '#22c55e' : progress >= 75 ? '#3b82f6' : progress >= 50 ? '#f59e0b' : '#ef4444'
+                                                        }}
+                                                    ></div>
+                                                </div>
+                                                <p className="text-sm mt-1" style={{ color: variance >= 0 ? '#22c55e' : '#ef4444' }}>
+                                                    {variance >= 0 ? '▲' : '▼'} {formatCurrencyFull(Math.abs(variance))} {variance >= 0 ? 'over' : 'below'} target
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
-                    view === 'timeline' && React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6 mb-6" },
-                        React.createElement('h3', { className: "text-xl font-bold mb-6 text-gray-800" }, "Monthly Timeline & Key Activities"),
-                        React.createElement('div', { className: "space-y-4" },
-                            monthlyData.map((data, index) =>
-                                React.createElement('div', { key: index, className: "flex items-start space-x-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 shadow-sm" },
-                                    React.createElement('div', { className: "bg-gradient-to-br from-blue-500 to-blue-600 text-white px-3 py-2 rounded-lg text-sm font-semibold min-w-fit shadow-lg" },
-                                        data.month
-                                    ),
-                                    React.createElement('div', { className: "flex-1" },
-                                        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-3 gap-4 mb-3" },
-                                            React.createElement('div', { className: "bg-white p-2 rounded border border-green-200 shadow-sm" },
-                                                React.createElement('span', { className: "font-semibold text-green-600" }, "Revenue: "),
-                                                React.createElement('span', { className: "font-bold" }, formatCurrencyFull(data.revenue))
-                                            ),
-                                            React.createElement('div', { className: "bg-white p-2 rounded border border-blue-200 shadow-sm" },
-                                                React.createElement('span', { className: "font-semibold text-blue-600" }, "Tickets: "),
-                                                React.createElement('span', { className: "font-bold" }, data.tickets.toLocaleString())
-                                            ),
-                                            React.createElement('div', { className: "bg-white p-2 rounded border border-purple-200 shadow-sm" },
-                                                React.createElement('span', { className: "font-semibold text-purple-600" }, "Sponsors: "),
-                                                React.createElement('span', { className: "font-bold" }, data.sponsors)
-                                            )
-                                        ),
-                                        React.createElement('div', { className: "text-sm text-gray-700 bg-white p-3 rounded border shadow-sm" },
-                                            React.createElement('strong', { className: "text-gray-800" }, "Key Activities: "), data.activities
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ),
+                        {view === 'targets' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4 text-gray-800">Ticket Targets</h3>
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>Ideas Fest:</span>
+                                            <span className="font-bold">2,500 tickets</span>
+                                        </div>
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>GBEA:</span>
+                                            <span className="font-bold">1,500 tickets @ £375</span>
+                                        </div>
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>UK Startup Regional:</span>
+                                            <span className="font-bold">1,500 tickets @ £55</span>
+                                        </div>
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>Fast Growth Index:</span>
+                                            <span className="font-bold">800 tickets @ £350</span>
+                                        </div>
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>UK Startup National:</span>
+                                            <span className="font-bold">400 tickets @ £99</span>
+                                        </div>
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>GBIA:</span>
+                                            <span className="font-bold">250 tickets @ £350</span>
+                                        </div>
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>Ideas Tables:</span>
+                                            <span className="font-bold">1,800 tickets @ £75</span>
+                                        </div>
+                                        <div className="flex justify-between p-3 bg-gray-50 rounded">
+                                            <span>Ideas Community:</span>
+                                            <span className="font-bold">5,000 members @ £49/mo</span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                    React.createElement('div', { className: "bg-white rounded-lg shadow-lg p-6 mt-6" },
-                        React.createElement('h3', { className: "text-xl font-bold mb-4 text-gray-800" }, "Monthly KPI Summary"),
-                        React.createElement('div', { className: "overflow-x-auto" },
-                            React.createElement('table', { className: "min-w-full table-auto text-sm" },
-                                React.createElement('thead', null,
-                                    React.createElement('tr', { className: "bg-gradient-to-r from-gray-50 to-gray-100" },
-                                        React.createElement('th', { className: "px-4 py-3 text-left font-semibold text-gray-700" }, "Month"),
-                                        React.createElement('th', { className: "px-4 py-3 text-right font-semibold text-gray-700" }, "Revenue Target"),
-                                        React.createElement('th', { className: "px-4 py-3 text-right font-semibold text-gray-700" }, "Tickets"),
-                                        React.createElement('th', { className: "px-4 py-3 text-right font-semibold text-gray-700" }, "Sponsors"),
-                                        React.createElement('th', { className: "px-4 py-3 text-right font-semibold text-gray-700" }, "Cumulative")
-                                    )
-                                ),
-                                React.createElement('tbody', null,
-                                    monthlyData.map((data, index) =>
-                                        React.createElement('tr', { key: index, className: "border-b hover:bg-gray-50 transition-colors duration-200" },
-                                            React.createElement('td', { className: "px-4 py-3 font-semibold text-gray-800" }, data.month),
-                                            React.createElement('td', { className: "px-4 py-3 text-right font-bold text-blue-600" }, formatCurrencyFull(data.revenue)),
-                                            React.createElement('td', { className: "px-4 py-3 text-right font-semibold text-green-600" }, data.tickets.toLocaleString()),
-                                            React.createElement('td', { className: "px-4 py-3 text-right font-semibold text-purple-600" }, data.sponsors),
-                                            React.createElement('td', { className: "px-4 py-3 text-right font-bold text-gray-700" }, formatCurrencyFull(cumulativeData[index].cumulative))
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ),
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h3 className="text-xl font-bold mb-4 text-gray-800">Sponsorship Targets</h3>
+                                    <div className="space-y-3">
+                                        <div className="border-l-4 border-red-500 pl-3 py-2 bg-red-50">
+                                            <h4 className="font-semibold">Headline Sponsors</h4>
+                                            <div className="text-sm text-gray-700">
+                                                <div>Ideas Fest: £225k (2 sponsors)</div>
+                                                <div>Fast Growth Index: £150k</div>
+                                                <div>GBEA: £50k</div>
+                                                <div>GBIA: £50k</div>
+                                            </div>
+                                        </div>
+                                        <div className="border-l-4 border-blue-500 pl-3 py-2 bg-blue-50">
+                                            <h4 className="font-semibold">Category Sponsors</h4>
+                                            <div className="text-sm text-gray-700">
+                                                <div>UK Startup Regional: 220 × £1,950 = £429k</div>
+                                                <div>UK Startup National: 22 × £5k = £110k</div>
+                                                <div>GBEA: 20 × £10k = £200k</div>
+                                                <div>GBIA: 13 × £10k = £130k</div>
+                                                <div>Ideas Fest Stage: 10 × £25k = £250k</div>
+                                            </div>
+                                        </div>
+                                        <div className="border-l-4 border-green-500 pl-3 py-2 bg-green-50">
+                                            <h4 className="font-semibold">Other Sponsors</h4>
+                                            <div className="text-sm text-gray-700">
+                                                <div>Traders: 100 × £1,750 = £175k</div>
+                                                <div>Tabletop: 100 × £595 = £59.5k</div>
+                                                <div>Ideas Community: 10 × £10k = £100k</div>
+                                                <div>Website & Digital: £265k</div>
+                                                <div>Partnerships: £100k</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                    React.createElement('footer', { className: "text-center text-gray-500 text-sm mt-8 pb-4" },
-                        React.createElement('p', null, `Ideas Business Dashboard • Updated ${new Date().toLocaleDateString()}`)
-                    )
-                )
+                        <footer className="text-center text-gray-500 text-sm mt-8 pb-4">
+                            <p>Ideas Forums Dashboard • Updated {new Date().toLocaleDateString()}</p>
+                        </footer>
+                    </div>
+                </div>
             );
         };
 
-        console.log('🔧 Ideas Dashboard: Setting up React app...');
         const domContainer = document.querySelector('#root');
-        console.log('📍 Ideas Dashboard: Found root container:', domContainer);
-        
         const root = ReactDOM.createRoot(domContainer);
-        console.log('🌱 Ideas Dashboard: Created React root');
-        
         root.render(React.createElement(MonthlySalesTargets));
-        console.log('🚀 Ideas Dashboard: App rendered successfully! Check above for component logs.');
     </script>
 </body>
 </html>
