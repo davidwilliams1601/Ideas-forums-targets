@@ -87,8 +87,8 @@
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             
-            // Annual targets
-            const targets = {
+            // Default targets
+            const defaultTargets = {
                 ideasFest: {
                     total: 3100000,
                     breakdown: { tickets: 2700000, sponsors: 400000 },
@@ -136,6 +136,12 @@
                 }
             };
 
+            // Editable targets
+            const [targets, setTargets] = useState(() => {
+                const saved = localStorage.getItem('ideasForumsTargets');
+                return saved ? JSON.parse(saved) : defaultTargets;
+            });
+
             const eventLabels = {
                 ideasFest: 'Ideas Fest',
                 uksuaRegionals: 'UKSUA Regionals',
@@ -157,6 +163,10 @@
             }, [monthlyActuals]);
 
             useEffect(() => {
+                localStorage.setItem('ideasForumsTargets', JSON.stringify(targets));
+            }, [targets]);
+
+            useEffect(() => {
                 localStorage.setItem('eventMappings', JSON.stringify(eventMappings));
             }, [eventMappings]);
 
@@ -172,6 +182,22 @@
                 localStorage.setItem('ticketTailorApiKey', apiKeyInput);
                 setApiKey(apiKeyInput);
                 setApiKeyInput('');
+            };
+
+            const resetTargets = () => {
+                if (confirm('Reset all targets to default values? This cannot be undone.')) {
+                    setTargets(defaultTargets);
+                }
+            };
+
+            const updateTarget = (eventKey, field, value) => {
+                setTargets({
+                    ...targets,
+                    [eventKey]: {
+                        ...targets[eventKey],
+                        [field]: parseFloat(value) || 0
+                    }
+                });
             };
 
             const makeApiRequest = async (endpoint) => {
@@ -316,7 +342,7 @@
                         chartInstance.current.destroy();
                     }
                 };
-            }, [view, actuals]);
+            }, [view, actuals, targets]);
 
             const renderChart = () => {
                 if (chartInstance.current) {
@@ -436,7 +462,9 @@
                             <div className="flex justify-between items-center">
                                 <div>
                                     <h1 className="text-3xl font-bold">Ideas Forums Revenue Dashboard</h1>
-                                    <p className="text-purple-100 mt-1">Annual Target: {formatCurrency(13347500)} • FY 2025-2026</p>
+                                    <p className="text-purple-100 mt-1">
+                                        Annual Target: {formatCurrency(Object.values(targets).reduce((sum, t) => sum + t.total, 0))} • FY 2025-2026
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     {lastSync && (
@@ -472,7 +500,7 @@
                     <div className="bg-white shadow-sm border-b">
                         <div className="max-w-7xl mx-auto px-6">
                             <div className="flex space-x-8">
-                                {['overview', 'monthly', 'actuals', 'settings'].map(tab => (
+                                {['overview', 'monthly', 'actuals', 'targets', 'settings'].map(tab => (
                                     <button
                                         key={tab}
                                         onClick={() => setView(tab)}
@@ -691,7 +719,7 @@
                             <div className="space-y-6">
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <p className="text-blue-800">
-                                        <strong>Note:</strong> Ticket numbers are automatically synced from Ticket Tailor. 
+                                        <strong>💡 Note:</strong> Ticket numbers are automatically synced from Ticket Tailor. 
                                         Use the fields below to manually enter sponsors, members, and other revenue data.
                                     </p>
                                 </div>
@@ -700,27 +728,27 @@
                                     <div key={eventKey} className="bg-white rounded-lg shadow p-6">
                                         <h3 className="font-bold text-lg mb-4">{eventLabels[eventKey]}</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            {actuals[eventKey]?.tickets !== undefined && (
+                                            {actuals[eventKey] && actuals[eventKey].tickets !== undefined && (
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Tickets Sold (Auto-synced)
+                                                        Tickets Sold (Auto-synced) 🎫
                                                     </label>
                                                     <input
                                                         type="number"
-                                                        value={actuals[eventKey].tickets}
+                                                        value={actuals[eventKey].tickets || 0}
                                                         disabled
-                                                        className="w-full px-4 py-2 border rounded-lg bg-gray-100"
+                                                        className="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-600"
                                                     />
                                                 </div>
                                             )}
-                                            {actuals[eventKey]?.sponsors !== undefined && (
+                                            {actuals[eventKey] && actuals[eventKey].sponsors !== undefined && (
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                                         Sponsors Secured
                                                     </label>
                                                     <input
                                                         type="number"
-                                                        value={actuals[eventKey].sponsors}
+                                                        value={actuals[eventKey].sponsors || 0}
                                                         onChange={(e) => setActuals({
                                                             ...actuals,
                                                             [eventKey]: {
@@ -728,18 +756,18 @@
                                                                 sponsors: parseInt(e.target.value) || 0
                                                             }
                                                         })}
-                                                        className="w-full px-4 py-2 border rounded-lg"
+                                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                                                     />
                                                 </div>
                                             )}
-                                            {actuals[eventKey]?.members !== undefined && (
+                                            {actuals[eventKey] && actuals[eventKey].members !== undefined && (
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
                                                         Members Signed Up
                                                     </label>
                                                     <input
                                                         type="number"
-                                                        value={actuals[eventKey].members}
+                                                        value={actuals[eventKey].members || 0}
                                                         onChange={(e) => setActuals({
                                                             ...actuals,
                                                             [eventKey]: {
@@ -747,7 +775,7 @@
                                                                 members: parseInt(e.target.value) || 0
                                                             }
                                                         })}
-                                                        className="w-full px-4 py-2 border rounded-lg"
+                                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                                                     />
                                                 </div>
                                             )}
@@ -757,7 +785,7 @@
                                                 </label>
                                                 <input
                                                     type="number"
-                                                    value={actuals[eventKey].revenue}
+                                                    value={actuals[eventKey]?.revenue || 0}
                                                     onChange={(e) => setActuals({
                                                         ...actuals,
                                                         [eventKey]: {
@@ -765,13 +793,59 @@
                                                             revenue: parseFloat(e.target.value) || 0
                                                         }
                                                     })}
-                                                    className="w-full px-4 py-2 border rounded-lg"
+                                                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                                                     placeholder="Enter total revenue"
                                                 />
                                             </div>
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {view === 'targets' && (
+                            <div className="space-y-6">
+                                <div className="bg-white rounded-lg shadow p-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-lg">Annual Revenue Targets (Editable)</h3>
+                                        <button
+                                            onClick={resetTargets}
+                                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                                        >
+                                            Reset to Defaults
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {Object.entries(targets).map(([key, value]) => (
+                                            <div key={key} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                                                <span className="font-medium w-64">{eventLabels[key]}:</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-600">£</span>
+                                                    <input
+                                                        type="number"
+                                                        value={value.total}
+                                                        onChange={(e) => updateTarget(key, 'total', e.target.value)}
+                                                        className="w-40 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                                                    />
+                                                    <span className="text-gray-600 ml-2">=</span>
+                                                    <span className="font-bold text-purple-600 ml-2">{formatCurrency(value.total)}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="flex items-center gap-4 p-4 bg-purple-100 rounded-lg font-bold text-lg">
+                                            <span className="w-64">Total Annual Target</span>
+                                            <span className="text-purple-600">
+                                                {formatCurrency(Object.values(targets).reduce((sum, t) => sum + t.total, 0))}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                    <p className="text-sm text-yellow-800">
+                                        <strong>💡 Tip:</strong> Changes to targets are saved automatically. Use "Reset to Defaults" to restore original values.
+                                    </p>
+                                </div>
                             </div>
                         )}
 
