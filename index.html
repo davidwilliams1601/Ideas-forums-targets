@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ideas Forums - Dashboard with Ticket Tailor Integration</title>
+    <title>Ideas Forums - Complete Dashboard with Ticket Tailor</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -36,6 +36,7 @@
 
         const IdeasForumsDashboard = () => {
             const [view, setView] = useState('overview');
+            const [selectedEvent, setSelectedEvent] = useState(null);
             const [apiKey, setApiKey] = useState(() => localStorage.getItem('ticketTailorApiKey') || '');
             const [apiKeyInput, setApiKeyInput] = useState('');
             const [lastSync, setLastSync] = useState(() => localStorage.getItem('lastSync') || null);
@@ -44,7 +45,10 @@
             const [useProxy, setUseProxy] = useState(() => localStorage.getItem('useProxy') === 'true');
             const [proxyUrl, setProxyUrl] = useState(() => localStorage.getItem('proxyUrl') || 'https://corsproxy.io/?');
             
-            // Event mappings - maps Ticket Tailor event IDs to Ideas Forums events
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+
+            // Event mappings
             const [eventMappings, setEventMappings] = useState(() => {
                 const saved = localStorage.getItem('eventMappings');
                 return saved ? JSON.parse(saved) : {
@@ -59,6 +63,13 @@
             
             const [ticketTailorEvents, setTicketTailorEvents] = useState([]);
             
+            // Monthly actuals
+            const [monthlyActuals, setMonthlyActuals] = useState(() => {
+                const saved = localStorage.getItem('ideasForumsMonthlyActuals');
+                return saved ? JSON.parse(saved) : {};
+            });
+
+            // Annual actuals
             const [actuals, setActuals] = useState(() => {
                 const saved = localStorage.getItem('ideasForumsActuals');
                 return saved ? JSON.parse(saved) : {
@@ -74,22 +85,76 @@
                 };
             });
 
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
             // Annual targets
             const targets = {
-                ideasFest: 3100000,
-                uksuaRegionals: 1852500,
-                uksuaNationals: 1275000,
-                gbea: 2000000,
-                gbia: 1800000,
-                fgi: 750000,
-                ideasCommunity: 3040000,
-                vcCollab: 2500000,
-                website: 30000
+                ideasFest: {
+                    total: 3100000,
+                    breakdown: { tickets: 2700000, sponsors: 400000 },
+                    monthly: [0, 0, 50000, 100000, 150000, 620000, 930000, 930000, 620000, 0, 0, 0]
+                },
+                uksuaRegionals: {
+                    total: 1852500,
+                    breakdown: { applications: 352500, sponsors: 1500000 },
+                    monthly: [0, 0, 50000, 100000, 555750, 741000, 555750, 0, 0, 0, 0, 0]
+                },
+                uksuaNationals: {
+                    total: 1275000,
+                    breakdown: { tickets: 525000, sponsors: 750000 },
+                    monthly: [0, 0, 0, 0, 0, 127500, 637500, 637500, 0, 0, 0, 0]
+                },
+                gbea: {
+                    total: 2000000,
+                    breakdown: { applications: 750000, tickets: 750000, sponsors: 500000 },
+                    monthly: [0, 200000, 200000, 200000, 200000, 200000, 200000, 400000, 400000, 200000, 200000, 200000]
+                },
+                gbia: {
+                    total: 1800000,
+                    breakdown: { applications: 300000, tickets: 1050000, sponsors: 450000 },
+                    monthly: [180000, 360000, 540000, 720000, 0, 0, 0, 0, 0, 0, 0, 0]
+                },
+                fgi: {
+                    total: 750000,
+                    breakdown: { tickets: 600000, sponsors: 150000 },
+                    monthly: [0, 0, 0, 0, 0, 0, 0, 0, 225000, 300000, 225000, 0]
+                },
+                ideasCommunity: {
+                    total: 3040000,
+                    breakdown: { membership: 3040000 },
+                    monthly: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1520000, 1520000]
+                },
+                vcCollab: {
+                    total: 2500000,
+                    breakdown: { partnerships: 2500000 },
+                    monthly: [208333, 208333, 208333, 208333, 208333, 208333, 208333, 208333, 208333, 208333, 208333, 208337]
+                },
+                website: {
+                    total: 30000,
+                    breakdown: { advertising: 30000 },
+                    monthly: [2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500]
+                }
+            };
+
+            const eventLabels = {
+                ideasFest: 'Ideas Fest',
+                uksuaRegionals: 'UKSUA Regionals',
+                uksuaNationals: 'UKSUA Nationals',
+                gbea: 'Great British Entrepreneur Awards',
+                gbia: 'Great British Industry Awards',
+                fgi: 'Fast Growth Index',
+                ideasCommunity: 'Ideas Community',
+                vcCollab: 'VC Collab',
+                website: 'Website'
             };
 
             useEffect(() => {
                 localStorage.setItem('ideasForumsActuals', JSON.stringify(actuals));
             }, [actuals]);
+
+            useEffect(() => {
+                localStorage.setItem('ideasForumsMonthlyActuals', JSON.stringify(monthlyActuals));
+            }, [monthlyActuals]);
 
             useEffect(() => {
                 localStorage.setItem('eventMappings', JSON.stringify(eventMappings));
@@ -119,25 +184,17 @@
                     'Accept': 'application/json'
                 };
                 
-                // Try different authentication methods
                 const authString = btoa(apiKey + ':');
                 headers['Authorization'] = 'Basic ' + authString;
-                
-                console.log('Making request to:', url);
-                console.log('Headers:', headers);
                 
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: headers,
-                    mode: useProxy ? 'cors' : 'cors'
+                    mode: 'cors'
                 });
-                
-                console.log('Response status:', response.status);
-                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
                 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('Error response:', errorText);
                     throw new Error(`API Error (${response.status}): ${errorText || response.statusText}`);
                 }
                 
@@ -152,9 +209,7 @@
                 
                 try {
                     setSyncError(null);
-                    console.log('Fetching events...');
                     const data = await makeApiRequest('events');
-                    console.log('Events data:', data);
                     setTicketTailorEvents(data.data || []);
                     if (!data.data || data.data.length === 0) {
                         setSyncError('No events found in your Ticket Tailor account');
@@ -190,14 +245,11 @@
                     const newActuals = { ...actuals };
                     let successCount = 0;
                     
-                    // Fetch issued tickets for each mapped event
                     for (const [eventKey, ttEventId] of Object.entries(eventMappings)) {
                         if (!ttEventId) continue;
                         
                         try {
-                            console.log(`Fetching data for ${eventKey} (${ttEventId})...`);
-                            
-                            // Fetch issued tickets for this event
+                            // Fetch issued tickets
                             try {
                                 const ticketsData = await makeApiRequest(`issued_tickets?event_id=${ttEventId}`);
                                 const ticketCount = ticketsData.data?.length || 0;
@@ -205,23 +257,20 @@
                                 if (newActuals[eventKey]) {
                                     newActuals[eventKey].tickets = ticketCount;
                                 }
-                                console.log(`${eventKey}: ${ticketCount} tickets`);
                             } catch (ticketsError) {
                                 console.error(`Error fetching tickets for ${eventKey}:`, ticketsError);
                             }
                             
-                            // Fetch orders to get revenue data
+                            // Fetch orders for revenue
                             try {
                                 const ordersData = await makeApiRequest(`orders?event_id=${ttEventId}`);
                                 const totalRevenue = ordersData.data?.reduce((sum, order) => {
                                     return sum + (order.total || 0);
                                 }, 0) || 0;
                                 
-                                // Update revenue (convert from cents to pounds)
                                 if (newActuals[eventKey]) {
                                     newActuals[eventKey].revenue = totalRevenue / 100;
                                 }
-                                console.log(`${eventKey}: £${totalRevenue / 100} revenue`);
                             } catch (ordersError) {
                                 console.error(`Error fetching orders for ${eventKey}:`, ordersError);
                             }
@@ -257,8 +306,78 @@
                 }
             }, [apiKey, view, useProxy, proxyUrl]);
 
+            // Chart rendering
+            useEffect(() => {
+                if (view === 'overview' && chartRef.current) {
+                    renderChart();
+                }
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+                };
+            }, [view, actuals]);
+
+            const renderChart = () => {
+                if (chartInstance.current) {
+                    chartInstance.current.destroy();
+                }
+
+                const ctx = chartRef.current.getContext('2d');
+                
+                const eventKeys = Object.keys(targets);
+                const targetData = eventKeys.map(key => targets[key].total);
+                const actualData = eventKeys.map(key => actuals[key]?.revenue || 0);
+                
+                chartInstance.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: eventKeys.map(key => eventLabels[key]),
+                        datasets: [
+                            {
+                                label: 'Target',
+                                data: targetData,
+                                backgroundColor: 'rgba(147, 51, 234, 0.5)',
+                                borderColor: 'rgba(147, 51, 234, 1)',
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'Actual',
+                                data: actualData,
+                                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return '£' + (value / 1000000).toFixed(1) + 'M';
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Revenue Targets vs Actuals by Stream'
+                            }
+                        }
+                    }
+                });
+            };
+
             const calculateProgress = (eventKey) => {
-                const target = targets[eventKey];
+                const target = targets[eventKey].total;
                 const actual = actuals[eventKey]?.revenue || 0;
                 return {
                     target,
@@ -269,7 +388,7 @@
             };
 
             const getTotalProgress = () => {
-                const totalTarget = Object.values(targets).reduce((a, b) => a + b, 0);
+                const totalTarget = Object.values(targets).reduce((sum, t) => sum + t.total, 0);
                 const totalActual = Object.entries(actuals).reduce((sum, [key, value]) => {
                     return sum + (value.revenue || 0);
                 }, 0);
@@ -298,16 +417,15 @@
                 return 'bg-red-500';
             };
 
-            const eventLabels = {
-                ideasFest: 'Ideas Fest',
-                uksuaRegionals: 'UKSUA Regionals',
-                uksuaNationals: 'UKSUA Nationals',
-                gbea: 'Great British Entrepreneur Awards',
-                gbia: 'Great British Industry Awards',
-                fgi: 'Fast Growth Index',
-                ideasCommunity: 'Ideas Community',
-                vcCollab: 'VC Collab',
-                website: 'Website'
+            const getMonthlyActual = (eventKey, monthIndex) => {
+                return monthlyActuals[`${eventKey}_${monthIndex}`] || 0;
+            };
+
+            const setMonthlyActual = (eventKey, monthIndex, value) => {
+                setMonthlyActuals({
+                    ...monthlyActuals,
+                    [`${eventKey}_${monthIndex}`]: value
+                });
             };
 
             return (
@@ -318,7 +436,7 @@
                             <div className="flex justify-between items-center">
                                 <div>
                                     <h1 className="text-3xl font-bold">Ideas Forums Revenue Dashboard</h1>
-                                    <p className="text-purple-100 mt-1">Annual Target: {formatCurrency(13275000)} • FY 2025-2026</p>
+                                    <p className="text-purple-100 mt-1">Annual Target: {formatCurrency(13347500)} • FY 2025-2026</p>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     {lastSync && (
@@ -338,7 +456,7 @@
                                         }`}
                                     >
                                         <span className={isSyncing ? 'sync-pulse' : ''}>🔄</span>
-                                        {isSyncing ? 'Syncing...' : 'Sync Now'}
+                                        {isSyncing ? 'Syncing...' : 'Sync Ticket Tailor'}
                                     </button>
                                 </div>
                             </div>
@@ -354,7 +472,7 @@
                     <div className="bg-white shadow-sm border-b">
                         <div className="max-w-7xl mx-auto px-6">
                             <div className="flex space-x-8">
-                                {['overview', 'actuals', 'settings', 'targets'].map(tab => (
+                                {['overview', 'monthly', 'actuals', 'settings'].map(tab => (
                                     <button
                                         key={tab}
                                         onClick={() => setView(tab)}
@@ -412,6 +530,13 @@
                                     })()}
                                 </div>
 
+                                {/* Chart */}
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <div className="chart-container">
+                                        <canvas ref={chartRef}></canvas>
+                                    </div>
+                                </div>
+
                                 {/* Individual Event Progress */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {Object.keys(targets).map(eventKey => {
@@ -447,6 +572,118 @@
                                         );
                                     })}
                                 </div>
+                            </div>
+                        )}
+
+                        {view === 'monthly' && (
+                            <div className="space-y-6">
+                                {/* Event Selector */}
+                                <div className="bg-white rounded-lg shadow p-6">
+                                    <h3 className="font-bold text-lg mb-4">Select Event for Monthly Breakdown</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {Object.keys(targets).map(eventKey => (
+                                            <button
+                                                key={eventKey}
+                                                onClick={() => setSelectedEvent(eventKey)}
+                                                className={`p-4 rounded-lg border-2 transition-colors ${
+                                                    selectedEvent === eventKey
+                                                        ? 'border-purple-600 bg-purple-50'
+                                                        : 'border-gray-200 hover:border-purple-300'
+                                                }`}
+                                            >
+                                                <div className="font-semibold">{eventLabels[eventKey]}</div>
+                                                <div className="text-sm text-gray-600">{formatCurrency(targets[eventKey].total)}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Monthly Breakdown Table */}
+                                {selectedEvent && (
+                                    <div className="bg-white rounded-lg shadow p-6">
+                                        <h3 className="font-bold text-lg mb-4">
+                                            {eventLabels[selectedEvent]} - Monthly Targets & Actuals
+                                        </h3>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead>
+                                                    <tr className="border-b-2">
+                                                        <th className="text-left py-3 px-4">Month</th>
+                                                        <th className="text-right py-3 px-4">Target</th>
+                                                        <th className="text-right py-3 px-4">Actual</th>
+                                                        <th className="text-right py-3 px-4">Variance</th>
+                                                        <th className="text-right py-3 px-4">%</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {targets[selectedEvent].monthly.map((monthTarget, index) => {
+                                                        const actual = getMonthlyActual(selectedEvent, index);
+                                                        const variance = actual - monthTarget;
+                                                        const percentage = monthTarget > 0 ? ((actual / monthTarget) * 100).toFixed(1) : 0;
+                                                        
+                                                        return (
+                                                            <tr key={index} className="border-b hover:bg-gray-50">
+                                                                <td className="py-3 px-4 font-medium">{months[index]}</td>
+                                                                <td className="py-3 px-4 text-right">{formatCurrency(monthTarget)}</td>
+                                                                <td className="py-3 px-4 text-right">
+                                                                    <input
+                                                                        type="number"
+                                                                        value={actual}
+                                                                        onChange={(e) => setMonthlyActual(selectedEvent, index, parseFloat(e.target.value) || 0)}
+                                                                        className="w-32 px-2 py-1 border rounded text-right"
+                                                                    />
+                                                                </td>
+                                                                <td className={`py-3 px-4 text-right font-semibold ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                                    {formatCurrency(Math.abs(variance))}
+                                                                    <span className="text-xs ml-1">{variance >= 0 ? '↑' : '↓'}</span>
+                                                                </td>
+                                                                <td className="py-3 px-4 text-right">{percentage}%</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    <tr className="bg-purple-50 font-bold">
+                                                        <td className="py-3 px-4">Total</td>
+                                                        <td className="py-3 px-4 text-right">{formatCurrency(targets[selectedEvent].total)}</td>
+                                                        <td className="py-3 px-4 text-right">
+                                                            {formatCurrency(targets[selectedEvent].monthly.reduce((sum, _, index) => sum + getMonthlyActual(selectedEvent, index), 0))}
+                                                        </td>
+                                                        <td className="py-3 px-4 text-right">
+                                                            {(() => {
+                                                                const totalActual = targets[selectedEvent].monthly.reduce((sum, _, index) => sum + getMonthlyActual(selectedEvent, index), 0);
+                                                                const totalVariance = totalActual - targets[selectedEvent].total;
+                                                                return (
+                                                                    <span className={totalVariance >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                        {formatCurrency(Math.abs(totalVariance))}
+                                                                        <span className="text-xs ml-1">{totalVariance >= 0 ? '↑' : '↓'}</span>
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                        </td>
+                                                        <td className="py-3 px-4 text-right">
+                                                            {(() => {
+                                                                const totalActual = targets[selectedEvent].monthly.reduce((sum, _, index) => sum + getMonthlyActual(selectedEvent, index), 0);
+                                                                return ((totalActual / targets[selectedEvent].total) * 100).toFixed(1);
+                                                            })()}%
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Revenue Breakdown */}
+                                        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                                            <h4 className="font-semibold mb-3">Revenue Breakdown</h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {Object.entries(targets[selectedEvent].breakdown).map(([key, value]) => (
+                                                    <div key={key} className="flex justify-between">
+                                                        <span className="capitalize">{key}:</span>
+                                                        <span className="font-semibold">{formatCurrency(value)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -592,7 +829,7 @@
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
                                     <h3 className="font-bold text-lg mb-4">🔧 Connection Settings</h3>
                                     <p className="text-gray-700 mb-4">
-                                        If you're getting CORS errors, enable the proxy below. This routes requests through a CORS proxy to avoid browser restrictions.
+                                        If you're getting CORS errors, enable the proxy below.
                                     </p>
                                     
                                     <div className="space-y-4">
@@ -605,7 +842,7 @@
                                                 className="w-5 h-5"
                                             />
                                             <label htmlFor="useProxy" className="font-medium">
-                                                Use CORS Proxy (enable if direct connection fails)
+                                                Use CORS Proxy
                                             </label>
                                         </div>
                                         
@@ -621,11 +858,7 @@
                                                 >
                                                     <option value="https://corsproxy.io/?">corsproxy.io</option>
                                                     <option value="https://api.allorigins.win/raw?url=">allorigins.win</option>
-                                                    <option value="https://cors-anywhere.herokuapp.com/">cors-anywhere (may require access)</option>
                                                 </select>
-                                                <p className="text-xs text-gray-500 mt-2">
-                                                    If one proxy doesn't work, try another. Some proxies have rate limits.
-                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -636,7 +869,7 @@
                                     <div className="bg-white rounded-lg shadow p-6">
                                         <h3 className="font-bold text-lg mb-4">Event Mappings</h3>
                                         <p className="text-gray-600 mb-4">
-                                            Map your Ticket Tailor events to Ideas Forums programs for automatic syncing.
+                                            Map your Ticket Tailor events to Ideas Forums programs.
                                         </p>
                                         
                                         <button
@@ -659,10 +892,10 @@
                                                             })}
                                                             className="flex-1 px-4 py-2 border rounded-lg"
                                                         >
-                                                            <option value="">-- Select Ticket Tailor Event --</option>
+                                                            <option value="">-- Select Event --</option>
                                                             {ticketTailorEvents.map(event => (
                                                                 <option key={event.id} value={event.id}>
-                                                                    {event.name} (ID: {event.id})
+                                                                    {event.name}
                                                                 </option>
                                                             ))}
                                                         </select>
@@ -671,29 +904,11 @@
                                             </div>
                                         ) : (
                                             <div className="text-gray-500 italic">
-                                                Click "Refresh Events List" to load your Ticket Tailor events
+                                                Click "Refresh Events List" to load events
                                             </div>
                                         )}
                                     </div>
                                 )}
-                            </div>
-                        )}
-
-                        {view === 'targets' && (
-                            <div className="bg-white rounded-lg shadow p-6">
-                                <h3 className="font-bold text-lg mb-4">Annual Revenue Targets</h3>
-                                <div className="space-y-3">
-                                    {Object.entries(targets).map(([key, value]) => (
-                                        <div key={key} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                                            <span className="font-medium">{eventLabels[key]}</span>
-                                            <span className="font-bold text-purple-600">{formatCurrency(value)}</span>
-                                        </div>
-                                    ))}
-                                    <div className="flex justify-between items-center p-4 bg-purple-100 rounded font-bold text-lg">
-                                        <span>Total Annual Target</span>
-                                        <span className="text-purple-600">{formatCurrency(Object.values(targets).reduce((a, b) => a + b, 0))}</span>
-                                    </div>
-                                </div>
                             </div>
                         )}
                     </div>
