@@ -42,8 +42,11 @@
             const [lastSync, setLastSync] = useState(() => localStorage.getItem('lastSync') || null);
             const [isSyncing, setIsSyncing] = useState(false);
             const [syncError, setSyncError] = useState(null);
-            const [useProxy, setUseProxy] = useState(() => localStorage.getItem('useProxy') === 'true');
-            const [proxyUrl, setProxyUrl] = useState(() => localStorage.getItem('proxyUrl') || 'https://corsproxy.io/?');
+            const [useProxy, setUseProxy] = useState(() => {
+                const saved = localStorage.getItem('useProxy');
+                return saved === null ? true : saved === 'true'; // Default to true for new users
+            });
+            const [proxyUrl, setProxyUrl] = useState(() => localStorage.getItem('proxyUrl') || 'vercel');
             
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
@@ -202,29 +205,59 @@
 
             const makeApiRequest = async (endpoint) => {
                 if (!apiKey) throw new Error('No API key configured');
-                
-                const baseUrl = 'https://api.tickettailor.com/v1/';
-                const url = useProxy ? `${proxyUrl}${baseUrl}${endpoint}` : `${baseUrl}${endpoint}`;
-                
+
+                let url;
                 const headers = {
                     'Accept': 'application/json'
                 };
-                
+
                 const authString = btoa(apiKey + ':');
                 headers['Authorization'] = 'Basic ' + authString;
-                
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: headers,
-                    mode: 'cors'
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API Error (${response.status}): ${errorText || response.statusText}`);
+
+                if (useProxy) {
+                    if (proxyUrl === 'vercel') {
+                        // Use Vercel serverless function
+                        url = `/api/tickettailor?endpoint=${encodeURIComponent(endpoint)}`;
+                        console.log(`Using Vercel proxy`);
+                    } else {
+                        // Use external CORS proxy (may not work with Authorization header)
+                        const baseUrl = 'https://api.tickettailor.com/v1/';
+                        url = `${proxyUrl}${baseUrl}${endpoint}`;
+                        console.log(`Using external proxy: ${proxyUrl}`);
+                    }
+                } else {
+                    // Direct connection (will fail due to CORS)
+                    url = `https://api.tickettailor.com/v1/${endpoint}`;
+                    console.log(`Direct connection (no proxy)`);
                 }
-                
-                return await response.json();
+
+                console.log(`API Request: ${endpoint}`);
+                console.log(`Full URL: ${url}`);
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: headers,
+                        mode: 'cors'
+                    });
+
+                    console.log(`Response status: ${response.status}`);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`API Error (${response.status}): ${errorText || response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    console.log(`Response data:`, data);
+                    return data;
+                } catch (error) {
+                    // Check for common network/CORS errors
+                    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                        throw new Error('CORS or network error. Try using the Vercel proxy or enable CORS in Settings.');
+                    }
+                    throw error;
+                }
             };
 
             const fetchTicketTailorEvents = async () => {
@@ -259,70 +292,105 @@
             };
 
             const syncTicketData = async () => {
+                console.log('🔄 Sync button clicked');
+                console.log('API Key present:', !!apiKey);
+                console.log('Event mappings:', eventMappings);
+
                 if (!apiKey) {
+                    console.error('❌ No API key configured');
                     setSyncError('Please configure your Ticket Tailor API key first');
                     return;
                 }
-                
+
+                // Check if any events are mapped
+                const mappedEvents = Object.entries(eventMappings).filter(([_, id]) => id);
+                console.log('Mapped events count:', mappedEvents.length);
+
+                if (mappedEvents.length === 0) {
+                    setSyncError('No events mapped. Please map at least one event in Settings.');
+                    console.error('❌ No events mapped');
+                    return;
+                }
+
                 setIsSyncing(true);
                 setSyncError(null);
-                
+                console.log('✅ Starting sync process...');
+
                 try {
                     const newActuals = { ...actuals };
                     let successCount = 0;
-                    
+                    let errorDetails = [];
+
                     for (const [eventKey, ttEventId] of Object.entries(eventMappings)) {
                         if (!ttEventId) continue;
-                        
+
+                        console.log(`📊 Syncing ${eventKey} (ID: ${ttEventId})`);
+
                         try {
                             // Fetch issued tickets
                             try {
+                                console.log(`  → Fetching tickets for ${eventKey}...`);
                                 const ticketsData = await makeApiRequest(`issued_tickets?event_id=${ttEventId}`);
                                 const ticketCount = ticketsData.data?.length || 0;
-                                
+                                console.log(`  ✓ Got ${ticketCount} tickets for ${eventKey}`);
+
                                 if (newActuals[eventKey]) {
                                     newActuals[eventKey].tickets = ticketCount;
                                 }
                             } catch (ticketsError) {
-                                console.error(`Error fetching tickets for ${eventKey}:`, ticketsError);
+                                console.error(`  ✗ Error fetching tickets for ${eventKey}:`, ticketsError);
+                                errorDetails.push(`${eventKey} tickets: ${ticketsError.message}`);
                             }
-                            
+
                             // Fetch orders for revenue
                             try {
+                                console.log(`  → Fetching orders for ${eventKey}...`);
                                 const ordersData = await makeApiRequest(`orders?event_id=${ttEventId}`);
                                 const totalRevenue = ordersData.data?.reduce((sum, order) => {
                                     return sum + (order.total || 0);
                                 }, 0) || 0;
-                                
+                                console.log(`  ✓ Got revenue £${(totalRevenue/100).toFixed(2)} for ${eventKey}`);
+
                                 if (newActuals[eventKey]) {
                                     newActuals[eventKey].revenue = totalRevenue / 100;
                                 }
                             } catch (ordersError) {
-                                console.error(`Error fetching orders for ${eventKey}:`, ordersError);
+                                console.error(`  ✗ Error fetching orders for ${eventKey}:`, ordersError);
+                                errorDetails.push(`${eventKey} orders: ${ordersError.message}`);
                             }
-                            
+
                             successCount++;
                         } catch (error) {
-                            console.error(`Error fetching data for ${eventKey}:`, error);
+                            console.error(`❌ Error fetching data for ${eventKey}:`, error);
+                            errorDetails.push(`${eventKey}: ${error.message}`);
                         }
                     }
-                    
+
+                    console.log(`✅ Successfully synced ${successCount} events`);
+
                     if (successCount === 0) {
-                        throw new Error('Failed to sync any events. Please check your event mappings and API key permissions.');
+                        const errorMsg = 'Failed to sync any events. ' + (errorDetails.length > 0 ? errorDetails.join('; ') : 'Please check your event mappings and API key permissions.');
+                        throw new Error(errorMsg);
                     }
-                    
+
                     setActuals(newActuals);
                     const now = new Date().toISOString();
                     setLastSync(now);
                     localStorage.setItem('lastSync', now);
-                    
-                    setSyncError(null);
-                    
+
+                    if (errorDetails.length > 0) {
+                        setSyncError(`Partial sync completed with errors: ${errorDetails.join('; ')}`);
+                    } else {
+                        setSyncError(null);
+                        console.log('🎉 Sync completed successfully!');
+                    }
+
                 } catch (error) {
-                    console.error('Sync error:', error);
+                    console.error('❌ Sync error:', error);
                     setSyncError('Failed to sync with Ticket Tailor: ' + error.message);
                 } finally {
                     setIsSyncing(false);
+                    console.log('🏁 Sync process finished');
                 }
             };
 
@@ -930,13 +998,64 @@
                                                     onChange={(e) => setProxyUrl(e.target.value)}
                                                     className="w-full px-4 py-2 border rounded-lg"
                                                 >
-                                                    <option value="https://corsproxy.io/?">corsproxy.io</option>
-                                                    <option value="https://api.allorigins.win/raw?url=">allorigins.win</option>
+                                                    <option value="vercel">Vercel Serverless (Recommended) ✓</option>
+                                                    <option value="https://corsproxy.io/?">corsproxy.io (May not work)</option>
+                                                    <option value="https://api.allorigins.win/raw?url=">allorigins.win (May not work)</option>
                                                 </select>
+                                                <p className="text-xs text-gray-600 mt-2">
+                                                    ⚠️ Public CORS proxies don't support Authorization headers. Use Vercel Serverless for best results.
+                                                </p>
                                             </div>
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Debug Panel */}
+                                {apiKey && (
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                                        <h3 className="font-bold text-lg mb-4">🔍 Configuration Status</h3>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span>API Key:</span>
+                                                <span className="font-semibold text-green-600">✓ Configured</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>CORS Proxy:</span>
+                                                <span className="font-semibold">
+                                                    {useProxy ? `✓ Enabled (${proxyUrl === 'vercel' ? 'Vercel Serverless' : proxyUrl})` : '✗ Disabled'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Events Mapped:</span>
+                                                <span className="font-semibold">
+                                                    {Object.values(eventMappings).filter(id => id).length} / 6
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>Last Sync:</span>
+                                                <span className="font-semibold">
+                                                    {lastSync ? new Date(lastSync).toLocaleString() : 'Never'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                console.log('=== DIAGNOSTIC INFO ===');
+                                                console.log('API Key configured:', !!apiKey);
+                                                console.log('API Key (first 10 chars):', apiKey ? apiKey.substring(0, 10) + '...' : 'none');
+                                                console.log('Use Proxy:', useProxy);
+                                                console.log('Proxy URL:', proxyUrl);
+                                                console.log('Event Mappings:', eventMappings);
+                                                console.log('Actuals:', actuals);
+                                                console.log('Last Sync:', lastSync);
+                                                alert('Diagnostic info logged to console. Press F12 to view.');
+                                            }}
+                                            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 w-full"
+                                        >
+                                            📋 View Full Diagnostic Info
+                                        </button>
+                                    </div>
+                                )}
 
                                 {/* Event Mappings */}
                                 {apiKey && (
@@ -945,7 +1064,7 @@
                                         <p className="text-gray-600 mb-4">
                                             Map your Ticket Tailor events to Ideas Forums programs.
                                         </p>
-                                        
+
                                         <button
                                             onClick={fetchTicketTailorEvents}
                                             className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
