@@ -85,7 +85,8 @@
                 actuals: localStorage.getItem('ideasForumsActuals'),
                 monthlyActuals: localStorage.getItem('ideasForumsMonthlyActuals'),
                 targets: localStorage.getItem('ideasForumsTargets'),
-                lastSync: localStorage.getItem('lastSync')
+                lastSync: localStorage.getItem('lastSync'),
+                sponsorDeals: localStorage.getItem('ideasForumsSponsorDeals')
             };
 
             const exportText = JSON.stringify(data, null, 2);
@@ -140,7 +141,8 @@
                     useProxy: 'useProxy',
                     proxyUrl: 'proxyUrl',
                     eventMappings: 'eventMappings',
-                    lastSync: 'lastSync'
+                    lastSync: 'lastSync',
+                    sponsorDeals: 'ideasForumsSponsorDeals'
                 };
 
                 Object.keys(data).forEach(key => {
@@ -184,7 +186,8 @@
                 'Last Sync': localStorage.getItem('lastSync') || 'Never',
                 'Actuals Available': localStorage.getItem('ideasForumsActuals') ? '✓ Yes' : '✗ No',
                 'Monthly Actuals': localStorage.getItem('ideasForumsMonthlyActuals') ? '✓ Yes' : '✗ No',
-                'Targets': localStorage.getItem('ideasForumsTargets') ? '✓ Yes' : '✗ No'
+                'Targets': localStorage.getItem('ideasForumsTargets') ? '✓ Yes' : '✗ No',
+                'Sponsor Deals': localStorage.getItem('ideasForumsSponsorDeals') ? '✓ Yes (' + JSON.parse(localStorage.getItem('ideasForumsSponsorDeals')).length + ' deals)' : '✗ No'
             };
 
             document.getElementById('status').textContent = JSON.stringify(status, null, 2);

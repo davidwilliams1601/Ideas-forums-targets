@@ -129,6 +129,12 @@
                 };
             });
 
+            // Sponsor deals
+            const [sponsorDeals, setSponsorDeals] = useState(() => {
+                const saved = localStorage.getItem('ideasForumsSponsorDeals');
+                return saved ? JSON.parse(saved) : [];
+            });
+
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             
             // Default targets
@@ -186,6 +192,8 @@
                 return saved ? JSON.parse(saved) : defaultTargets;
             });
 
+            const SPONSOR_ELIGIBLE_EVENTS = ['ideasFest', 'uksuaRegionals', 'uksuaNationals', 'gbea', 'gbia', 'fgi'];
+
             const eventLabels = {
                 ideasFest: 'Ideas Fest',
                 uksuaRegionals: 'UKSUA Regionals',
@@ -225,6 +233,25 @@
             useEffect(() => {
                 localStorage.setItem('boxOffices', JSON.stringify(boxOffices));
             }, [boxOffices]);
+
+            useEffect(() => {
+                localStorage.setItem('ideasForumsSponsorDeals', JSON.stringify(sponsorDeals));
+            }, [sponsorDeals]);
+
+            // Auto-derive sponsors count from confirmed+paid deals
+            useEffect(() => {
+                const newActuals = { ...actuals };
+                let changed = false;
+                SPONSOR_ELIGIBLE_EVENTS.forEach(eventKey => {
+                    if (!newActuals[eventKey]) return;
+                    const count = sponsorDeals.filter(d => d.eventKey === eventKey && (d.status === 'confirmed' || d.status === 'paid')).length;
+                    if (newActuals[eventKey].sponsors !== count) {
+                        newActuals[eventKey] = { ...newActuals[eventKey], sponsors: count };
+                        changed = true;
+                    }
+                });
+                if (changed) setActuals(newActuals);
+            }, [sponsorDeals]);
 
             const hasAnyBoxOffice = Object.keys(boxOffices).length > 0;
 
@@ -594,6 +621,48 @@
                 }).format(value);
             };
 
+            const getDealsForEvent = (eventKey) => sponsorDeals.filter(d => d.eventKey === eventKey);
+
+            const getSponsorSummary = (eventKey) => {
+                const deals = getDealsForEvent(eventKey);
+                const pipeline = deals.filter(d => d.status === 'pipeline');
+                const confirmed = deals.filter(d => d.status === 'confirmed');
+                const paid = deals.filter(d => d.status === 'paid');
+                const securedAmount = [...confirmed, ...paid].reduce((sum, d) => sum + d.amount, 0);
+                const sponsorTarget = targets[eventKey]?.breakdown?.sponsors || 0;
+                return {
+                    pipelineCount: pipeline.length,
+                    confirmedCount: confirmed.length,
+                    paidCount: paid.length,
+                    securedCount: confirmed.length + paid.length,
+                    totalCount: deals.length,
+                    pipelineAmount: pipeline.reduce((sum, d) => sum + d.amount, 0),
+                    securedAmount,
+                    totalAmount: deals.reduce((sum, d) => sum + d.amount, 0),
+                    sponsorTarget
+                };
+            };
+
+            const addDeal = (eventKey) => {
+                setSponsorDeals([...sponsorDeals, {
+                    id: 'deal_' + Date.now(),
+                    eventKey,
+                    company: '',
+                    amount: 0,
+                    status: 'pipeline'
+                }]);
+            };
+
+            const updateDeal = (dealId, updates) => {
+                setSponsorDeals(sponsorDeals.map(d => d.id === dealId ? { ...d, ...updates } : d));
+            };
+
+            const deleteDeal = (dealId) => {
+                if (confirm('Delete this sponsorship deal?')) {
+                    setSponsorDeals(sponsorDeals.filter(d => d.id !== dealId));
+                }
+            };
+
             const getProgressColor = (percentage) => {
                 if (percentage >= 100) return 'bg-green-500';
                 if (percentage >= 75) return 'bg-blue-500';
@@ -745,6 +814,34 @@
                                                             <span className="font-semibold">{actuals[eventKey].tickets}</span>
                                                         </div>
                                                     )}
+                                                    {SPONSOR_ELIGIBLE_EVENTS.includes(eventKey) && (() => {
+                                                        const ss = getSponsorSummary(eventKey);
+                                                        if (ss.totalCount === 0 && !ss.sponsorTarget) return null;
+                                                        return (
+                                                            <>
+                                                                <div className="flex justify-between text-sm">
+                                                                    <span className="text-gray-600">Sponsors:</span>
+                                                                    <span className="font-semibold">
+                                                                        {ss.securedCount} secured{ss.pipelineCount > 0 ? ` (${ss.pipelineCount} pipeline)` : ''}
+                                                                    </span>
+                                                                </div>
+                                                                {ss.sponsorTarget > 0 && (
+                                                                    <div>
+                                                                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                                            <span>{formatCurrency(ss.securedAmount)} secured</span>
+                                                                            <span>{formatCurrency(ss.sponsorTarget)} target</span>
+                                                                        </div>
+                                                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                            <div
+                                                                                className="bg-purple-500 h-2 rounded-full progress-bar"
+                                                                                style={{ width: `${Math.min((ss.securedAmount / ss.sponsorTarget) * 100, 100)}%` }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="w-full bg-gray-200 rounded-full h-6">
                                                     <div 
@@ -902,19 +999,13 @@
                                             {actuals[eventKey] && actuals[eventKey].sponsors !== undefined && (
                                                 <div>
                                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Sponsors Secured
+                                                        Sponsors Secured (from deals)
                                                     </label>
                                                     <input
                                                         type="number"
                                                         value={actuals[eventKey].sponsors || 0}
-                                                        onChange={(e) => setActuals({
-                                                            ...actuals,
-                                                            [eventKey]: {
-                                                                ...actuals[eventKey],
-                                                                sponsors: parseInt(e.target.value) || 0
-                                                            }
-                                                        })}
-                                                        className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                                                        disabled
+                                                        className="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-600"
                                                     />
                                                 </div>
                                             )}
@@ -956,6 +1047,88 @@
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Sponsorship Deals Section */}
+                                        {SPONSOR_ELIGIBLE_EVENTS.includes(eventKey) && (
+                                            <div className="mt-4 border-t pt-4">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <h4 className="font-semibold text-sm text-gray-700">Sponsorship Deals</h4>
+                                                    <button
+                                                        onClick={() => addDeal(eventKey)}
+                                                        className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700"
+                                                    >
+                                                        + Add Deal
+                                                    </button>
+                                                </div>
+                                                {getDealsForEvent(eventKey).length > 0 ? (
+                                                    <div className="space-y-2">
+                                                        {getDealsForEvent(eventKey).map(deal => (
+                                                            <div key={deal.id} className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                                                                <input
+                                                                    type="text"
+                                                                    value={deal.company}
+                                                                    onChange={(e) => updateDeal(deal.id, { company: e.target.value })}
+                                                                    placeholder="Company name"
+                                                                    className="flex-1 px-2 py-1 border rounded text-sm"
+                                                                />
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-gray-500 text-sm">£</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={deal.amount || ''}
+                                                                        onChange={(e) => updateDeal(deal.id, { amount: parseInt(e.target.value) || 0 })}
+                                                                        placeholder="0"
+                                                                        className="w-24 px-2 py-1 border rounded text-sm text-right"
+                                                                    />
+                                                                </div>
+                                                                <select
+                                                                    value={deal.status}
+                                                                    onChange={(e) => updateDeal(deal.id, { status: e.target.value })}
+                                                                    className={`px-2 py-1 border rounded text-sm font-medium ${
+                                                                        deal.status === 'pipeline' ? 'bg-yellow-100 text-yellow-800' :
+                                                                        deal.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                                                                        'bg-green-100 text-green-800'
+                                                                    }`}
+                                                                >
+                                                                    <option value="pipeline">Pipeline</option>
+                                                                    <option value="confirmed">Confirmed</option>
+                                                                    <option value="paid">Paid</option>
+                                                                </select>
+                                                                <button
+                                                                    onClick={() => deleteDeal(deal.id)}
+                                                                    className="px-2 py-1 text-red-500 hover:bg-red-50 rounded text-sm"
+                                                                    title="Delete deal"
+                                                                >
+                                                                    ✕
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        {/* Summary row */}
+                                                        {(() => {
+                                                            const ss = getSponsorSummary(eventKey);
+                                                            const confirmedAmount = getDealsForEvent(eventKey).filter(d => d.status === 'confirmed').reduce((s,d) => s+d.amount, 0);
+                                                            const paidAmount = getDealsForEvent(eventKey).filter(d => d.status === 'paid').reduce((s,d) => s+d.amount, 0);
+                                                            return (
+                                                                <div className="flex justify-between items-center text-xs text-gray-600 pt-2 border-t mt-2">
+                                                                    <div className="flex gap-3">
+                                                                        <span className="text-yellow-700">Pipeline: {formatCurrency(ss.pipelineAmount)}</span>
+                                                                        <span className="text-blue-700">Confirmed: {formatCurrency(confirmedAmount)}</span>
+                                                                        <span className="text-green-700">Paid: {formatCurrency(paidAmount)}</span>
+                                                                    </div>
+                                                                    {ss.sponsorTarget > 0 && (
+                                                                        <span className="font-medium">
+                                                                            {formatCurrency(ss.securedAmount)} / {formatCurrency(ss.sponsorTarget)} target
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-400 italic">No deals yet. Click "Add Deal" to start tracking.</p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
