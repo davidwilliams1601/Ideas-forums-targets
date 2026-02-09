@@ -3,6 +3,10 @@
     "api/tickettailor.js": {
       "memory": 1024,
       "maxDuration": 10
+    },
+    "api/hubspot.js": {
+      "memory": 1024,
+      "maxDuration": 10
     }
   }
 }

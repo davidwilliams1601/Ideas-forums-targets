@@ -135,6 +135,19 @@
                 return saved ? JSON.parse(saved) : [];
             });
 
+            // HubSpot integration state
+            const [hubspotApiKey, setHubspotApiKey] = useState(() => localStorage.getItem('hubspotApiKey') || '');
+            const [hubspotPipelineId, setHubspotPipelineId] = useState(() => localStorage.getItem('hubspotPipelineId') || '');
+            const [hubspotEventProperty, setHubspotEventProperty] = useState(() => localStorage.getItem('hubspotEventProperty') || '');
+            const [hubspotEventMappings, setHubspotEventMappings] = useState(() => {
+                const saved = localStorage.getItem('hubspotEventMappings');
+                return saved ? JSON.parse(saved) : {};
+            });
+            const [hubspotLastSync, setHubspotLastSync] = useState(() => localStorage.getItem('hubspotLastSync') || null);
+            const [hubspotPipelines, setHubspotPipelines] = useState([]);
+            const [isHubspotSyncing, setIsHubspotSyncing] = useState(false);
+            const [hubspotSyncError, setHubspotSyncError] = useState(null);
+
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             
             // Default targets
@@ -237,6 +250,25 @@
             useEffect(() => {
                 localStorage.setItem('ideasForumsSponsorDeals', JSON.stringify(sponsorDeals));
             }, [sponsorDeals]);
+
+            useEffect(() => {
+                if (hubspotApiKey) localStorage.setItem('hubspotApiKey', hubspotApiKey);
+                else localStorage.removeItem('hubspotApiKey');
+            }, [hubspotApiKey]);
+
+            useEffect(() => {
+                if (hubspotPipelineId) localStorage.setItem('hubspotPipelineId', hubspotPipelineId);
+                else localStorage.removeItem('hubspotPipelineId');
+            }, [hubspotPipelineId]);
+
+            useEffect(() => {
+                if (hubspotEventProperty) localStorage.setItem('hubspotEventProperty', hubspotEventProperty);
+                else localStorage.removeItem('hubspotEventProperty');
+            }, [hubspotEventProperty]);
+
+            useEffect(() => {
+                localStorage.setItem('hubspotEventMappings', JSON.stringify(hubspotEventMappings));
+            }, [hubspotEventMappings]);
 
             // Auto-derive sponsors count from confirmed+paid deals
             useEffect(() => {
@@ -527,6 +559,125 @@
                 }
             };
 
+            // HubSpot API helpers
+            const makeHubspotRequest = async (endpoint, method = 'GET', body = null) => {
+                if (!hubspotApiKey) throw new Error('No HubSpot API key configured');
+                const url = `/api/hubspot?endpoint=${encodeURIComponent(endpoint)}`;
+                const options = {
+                    method,
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${hubspotApiKey}`
+                    }
+                };
+                if (body) options.body = JSON.stringify(body);
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HubSpot API Error (${response.status}): ${errorText || response.statusText}`);
+                }
+                return response.json();
+            };
+
+            const fetchHubspotPipelines = async () => {
+                const data = await makeHubspotRequest('crm/v3/pipelines/deals');
+                setHubspotPipelines(data.results || []);
+                return data.results || [];
+            };
+
+            const syncHubspotDeals = async () => {
+                if (!hubspotApiKey || !hubspotPipelineId || !hubspotEventProperty) {
+                    setHubspotSyncError('Please configure HubSpot API key, pipeline, and event property name first.');
+                    return;
+                }
+                setIsHubspotSyncing(true);
+                setHubspotSyncError(null);
+                try {
+                    // Find the "closedwon" stage ID for this pipeline
+                    let pipelines = hubspotPipelines;
+                    if (pipelines.length === 0) {
+                        pipelines = await fetchHubspotPipelines();
+                    }
+                    const pipeline = pipelines.find(p => p.id === hubspotPipelineId);
+                    if (!pipeline) throw new Error('Selected pipeline not found');
+                    const closedWonStage = pipeline.stages.find(s => s.id === 'closedwon' || s.label.toLowerCase() === 'closed won');
+                    if (!closedWonStage) throw new Error('No "Closed Won" stage found in selected pipeline');
+
+                    // Search for closed-won deals, paginated
+                    let allDeals = [];
+                    let after = undefined;
+                    while (true) {
+                        const searchBody = {
+                            filterGroups: [{
+                                filters: [
+                                    { propertyName: 'pipeline', operator: 'EQ', value: hubspotPipelineId },
+                                    { propertyName: 'dealstage', operator: 'EQ', value: closedWonStage.id }
+                                ]
+                            }],
+                            properties: ['dealname', 'amount', hubspotEventProperty],
+                            limit: 100
+                        };
+                        if (after) searchBody.after = after;
+                        const data = await makeHubspotRequest('crm/v3/objects/deals/search', 'POST', searchBody);
+                        allDeals = allDeals.concat(data.results || []);
+                        if (data.paging?.next?.after) {
+                            after = data.paging.next.after;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    console.log(`HubSpot: fetched ${allDeals.length} closed-won deals`);
+
+                    // Dedup and map
+                    const existingHsIds = new Set(sponsorDeals.filter(d => d.hubspotDealId).map(d => d.hubspotDealId));
+                    let importedCount = 0;
+                    const newDeals = [];
+
+                    for (const deal of allDeals) {
+                        const hsId = deal.id;
+                        if (existingHsIds.has(hsId)) continue;
+
+                        const eventPropValue = deal.properties[hubspotEventProperty];
+                        const eventKey = hubspotEventMappings[eventPropValue];
+                        if (!eventKey) {
+                            console.log(`HubSpot: skipping deal "${deal.properties.dealname}" — unmapped event value "${eventPropValue}"`);
+                            continue;
+                        }
+
+                        newDeals.push({
+                            id: 'deal_hs_' + hsId,
+                            eventKey,
+                            company: deal.properties.dealname || 'Unknown',
+                            amount: parseInt(deal.properties.amount) || 0,
+                            status: 'paid',
+                            hubspotDealId: hsId,
+                            source: 'hubspot'
+                        });
+                        importedCount++;
+                    }
+
+                    if (newDeals.length > 0) {
+                        setSponsorDeals(prev => [...prev, ...newDeals]);
+                    }
+
+                    const now = new Date().toISOString();
+                    setHubspotLastSync(now);
+                    localStorage.setItem('hubspotLastSync', now);
+                    console.log(`HubSpot sync complete: ${importedCount} new deals imported, ${allDeals.length - importedCount} skipped`);
+
+                    if (importedCount === 0 && allDeals.length > 0) {
+                        setHubspotSyncError(`No new deals imported (${allDeals.length} found, all already synced or unmapped).`);
+                    }
+                } catch (error) {
+                    console.error('HubSpot sync error:', error);
+                    setHubspotSyncError('HubSpot sync failed: ' + error.message);
+                } finally {
+                    setIsHubspotSyncing(false);
+                }
+            };
+
             useEffect(() => {
                 if (hasAnyBoxOffice && view === 'settings') {
                     fetchAllBoxOfficeEvents();
@@ -729,11 +880,30 @@
                                         <span className={isSyncing ? 'sync-pulse' : ''}>🔄</span>
                                         {isSyncing ? 'Syncing...' : 'Sync Ticket Tailor'}
                                     </button>
+                                    {hubspotApiKey && (
+                                        <button
+                                            onClick={syncHubspotDeals}
+                                            disabled={isHubspotSyncing}
+                                            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                                                isHubspotSyncing
+                                                    ? 'bg-purple-300 cursor-not-allowed'
+                                                    : 'bg-white text-orange-600 hover:bg-orange-50'
+                                            }`}
+                                        >
+                                            <span className={isHubspotSyncing ? 'sync-pulse' : ''}>🔄</span>
+                                            {isHubspotSyncing ? 'Syncing...' : 'Sync HubSpot'}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             {syncError && (
                                 <div className="mt-2 bg-red-500 text-white px-4 py-2 rounded">
                                     ⚠️ {syncError}
+                                </div>
+                            )}
+                            {hubspotSyncError && (
+                                <div className="mt-2 bg-orange-500 text-white px-4 py-2 rounded">
+                                    ⚠️ {hubspotSyncError}
                                 </div>
                             )}
                         </div>
@@ -1080,6 +1250,9 @@
                                                     <div className="space-y-2">
                                                         {getDealsForEvent(eventKey).map(deal => (
                                                             <div key={deal.id} className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                                                                {deal.source === 'hubspot' && (
+                                                                    <span className="px-1.5 py-0.5 bg-blue-500 text-white text-xs font-bold rounded" title="Synced from HubSpot">HS</span>
+                                                                )}
                                                                 <input
                                                                     type="text"
                                                                     value={deal.company}
