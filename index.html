@@ -1679,6 +1679,133 @@
                                         )}
                                     </div>
                                 )}
+
+                                {/* HubSpot CRM Integration */}
+                                <div className="bg-white rounded-lg shadow p-6">
+                                    <h3 className="font-bold text-lg mb-4">HubSpot CRM Integration</h3>
+                                    <p className="text-gray-600 mb-4">
+                                        Connect HubSpot to automatically import closed-won deals as sponsor entries.
+                                    </p>
+
+                                    {/* API Key */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">HubSpot Private App Token</label>
+                                        <input
+                                            type="password"
+                                            value={hubspotApiKey}
+                                            onChange={(e) => setHubspotApiKey(e.target.value)}
+                                            placeholder="pat-xx-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                                            className="w-full px-3 py-2 border rounded-lg"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Create a Private App in HubSpot {'>'} Settings {'>'} Integrations {'>'} Private Apps with <strong>crm.objects.deals</strong> read scope.
+                                        </p>
+                                    </div>
+
+                                    {hubspotApiKey && (
+                                        <div className="space-y-4">
+                                            {/* Pipeline Selection */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Deal Pipeline</label>
+                                                <div className="flex gap-2">
+                                                    <select
+                                                        value={hubspotPipelineId}
+                                                        onChange={(e) => setHubspotPipelineId(e.target.value)}
+                                                        className="flex-1 px-3 py-2 border rounded-lg"
+                                                    >
+                                                        <option value="">-- Select Pipeline --</option>
+                                                        {hubspotPipelines.map(p => (
+                                                            <option key={p.id} value={p.id}>{p.label}</option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await fetchHubspotPipelines();
+                                                            } catch (e) {
+                                                                setHubspotSyncError('Failed to fetch pipelines: ' + e.message);
+                                                            }
+                                                        }}
+                                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                                                    >
+                                                        Load Pipelines
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Event Property Name */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Event Property Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={hubspotEventProperty}
+                                                    onChange={(e) => setHubspotEventProperty(e.target.value)}
+                                                    placeholder="e.g. event_name or hs_custom_property"
+                                                    className="w-full px-3 py-2 border rounded-lg"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    The HubSpot deal property that identifies which event a deal belongs to (internal name, not label).
+                                                </p>
+                                            </div>
+
+                                            {/* Event Value Mappings */}
+                                            {hubspotEventProperty && (
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Event Value Mappings</label>
+                                                    <p className="text-xs text-gray-500 mb-3">
+                                                        Map the values from your HubSpot "{hubspotEventProperty}" property to your Ideas Forums events.
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {SPONSOR_ELIGIBLE_EVENTS.map(eventKey => {
+                                                            const currentValue = Object.entries(hubspotEventMappings).find(([_, v]) => v === eventKey)?.[0] || '';
+                                                            return (
+                                                                <div key={eventKey} className="flex items-center gap-3">
+                                                                    <label className="w-44 text-sm font-medium">{eventLabels[eventKey]}:</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={currentValue}
+                                                                        onChange={(e) => {
+                                                                            const newMappings = { ...hubspotEventMappings };
+                                                                            // Remove old mapping for this event
+                                                                            for (const [k, v] of Object.entries(newMappings)) {
+                                                                                if (v === eventKey) delete newMappings[k];
+                                                                            }
+                                                                            // Add new mapping if value provided
+                                                                            if (e.target.value.trim()) {
+                                                                                newMappings[e.target.value.trim()] = eventKey;
+                                                                            }
+                                                                            setHubspotEventMappings(newMappings);
+                                                                        }}
+                                                                        placeholder={`HubSpot value for ${eventLabels[eventKey]}`}
+                                                                        className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Sync Status */}
+                                            <div className="flex items-center justify-between pt-2 border-t">
+                                                <div className="text-sm text-gray-600">
+                                                    Last HubSpot sync: {hubspotLastSync ? new Date(hubspotLastSync).toLocaleString() : 'Never'}
+                                                </div>
+                                                <button
+                                                    onClick={syncHubspotDeals}
+                                                    disabled={isHubspotSyncing || !hubspotPipelineId || !hubspotEventProperty}
+                                                    className={`px-4 py-2 rounded-lg text-sm ${
+                                                        isHubspotSyncing || !hubspotPipelineId || !hubspotEventProperty
+                                                            ? 'bg-gray-300 cursor-not-allowed'
+                                                            : 'bg-orange-600 text-white hover:bg-orange-700'
+                                                    }`}
+                                                >
+                                                    {isHubspotSyncing ? 'Syncing...' : 'Sync HubSpot Deals'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
