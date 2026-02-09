@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ideas Forums - Data Backup/Restore Tool</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #7c3aed; }
+        button {
+            background: #7c3aed;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #6d28d9; }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Ideas Forums Data Backup/Restore</h1>
+        <p>Use this tool to backup data from one domain and restore it on another.</p>
+
+        <div class="section">
+            <h2>Step 1: Export Data</h2>
+            <p>Click this button to export all your dashboard data:</p>
+            <button onclick="exportData()">📤 Export Current Data</button>
+            <div id="exportResult"></div>
+            <textarea id="exportData" placeholder="Exported data will appear here..."></textarea>
+        </div>
+
+        <div class="section">
+            <h2>Step 2: Import Data</h2>
+            <p>Paste your exported data below and click Import:</p>
+            <textarea id="importData" placeholder="Paste exported data here..."></textarea>
+            <button onclick="importData()">📥 Import Data</button>
+            <div id="importResult"></div>
+        </div>
+
+        <div class="section">
+            <h2>Current Storage Status</h2>
+            <button onclick="showStatus()">🔍 Check Current Data</button>
+            <pre id="status"></pre>
+        </div>
+    </div>
+
+    <script>
+        function exportData() {
+            const data = {
+                boxOffices: localStorage.getItem('boxOffices'),
+                useProxy: localStorage.getItem('useProxy'),
+                proxyUrl: localStorage.getItem('proxyUrl'),
+                eventMappings: localStorage.getItem('eventMappings'),
+                actuals: localStorage.getItem('ideasForumsActuals'),
+                monthlyActuals: localStorage.getItem('ideasForumsMonthlyActuals'),
+                targets: localStorage.getItem('ideasForumsTargets'),
+                lastSync: localStorage.getItem('lastSync')
+            };
+
+            const exportText = JSON.stringify(data, null, 2);
+            document.getElementById('exportData').value = exportText;
+            document.getElementById('exportResult').innerHTML =
+                '<p class="success">✓ Data exported! Copy the text above and save it.</p>';
+        }
+
+        function migrateImportedData(data) {
+            // Handle old-format backup that has apiKey instead of boxOffices
+            if (data.apiKey && !data.boxOffices) {
+                const boId = 'bo_' + Date.now();
+                const boxOffices = {};
+                boxOffices[boId] = {
+                    id: boId,
+                    name: 'Default Box Office',
+                    platform: 'tickettailor',
+                    apiKey: data.apiKey
+                };
+                data.boxOffices = JSON.stringify(boxOffices);
+
+                // Convert flat eventMappings to new format
+                if (data.eventMappings) {
+                    const old = JSON.parse(data.eventMappings);
+                    const converted = {};
+                    for (const k of Object.keys(old)) {
+                        converted[k] = old[k] ? { boxOfficeId: boId, eventId: old[k] } : null;
+                    }
+                    data.eventMappings = JSON.stringify(converted);
+                }
+                delete data.apiKey;
+            }
+            return data;
+        }
+
+        function importData() {
+            try {
+                const importText = document.getElementById('importData').value;
+                if (!importText) {
+                    throw new Error('Please paste data to import');
+                }
+
+                let data = JSON.parse(importText);
+                data = migrateImportedData(data);
+
+                // Key mapping from export keys to localStorage keys
+                const keyMap = {
+                    boxOffices: 'boxOffices',
+                    actuals: 'ideasForumsActuals',
+                    monthlyActuals: 'ideasForumsMonthlyActuals',
+                    targets: 'ideasForumsTargets',
+                    useProxy: 'useProxy',
+                    proxyUrl: 'proxyUrl',
+                    eventMappings: 'eventMappings',
+                    lastSync: 'lastSync'
+                };
+
+                Object.keys(data).forEach(key => {
+                    if (data[key] !== null) {
+                        const storageKey = keyMap[key] || key;
+                        localStorage.setItem(storageKey, data[key]);
+                    }
+                });
+
+                // Clean up old key if present
+                localStorage.removeItem('ticketTailorApiKey');
+
+                document.getElementById('importResult').innerHTML =
+                    '<p class="success">✓ Data imported successfully! Reload the dashboard page.</p>';
+
+                showStatus();
+            } catch (error) {
+                document.getElementById('importResult').innerHTML =
+                    '<p class="error">✗ Import failed: ' + error.message + '</p>';
+            }
+        }
+
+        function showStatus() {
+            const boxOfficesRaw = localStorage.getItem('boxOffices');
+            let boSummary = '✗ None';
+            if (boxOfficesRaw) {
+                const bo = JSON.parse(boxOfficesRaw);
+                const count = Object.keys(bo).length;
+                if (count > 0) {
+                    boSummary = '✓ ' + count + ' box office(s): ' + Object.values(bo).map(b => b.name).join(', ');
+                }
+            }
+
+            const status = {
+                'Box Offices': boSummary,
+                'Use Proxy': localStorage.getItem('useProxy') || 'Not set',
+                'Proxy URL': localStorage.getItem('proxyUrl') || 'Not set',
+                'Event Mappings': localStorage.getItem('eventMappings') ?
+                    JSON.parse(localStorage.getItem('eventMappings')) :
+                    'None',
+                'Last Sync': localStorage.getItem('lastSync') || 'Never',
+                'Actuals Available': localStorage.getItem('ideasForumsActuals') ? '✓ Yes' : '✗ No',
+                'Monthly Actuals': localStorage.getItem('ideasForumsMonthlyActuals') ? '✓ Yes' : '✗ No',
+                'Targets': localStorage.getItem('ideasForumsTargets') ? '✓ Yes' : '✗ No'
+            };
+
+            document.getElementById('status').textContent = JSON.stringify(status, null, 2);
+        }
+
+        // Show status on load
+        showStatus();
+    </script>
+</body>
+</html>

@@ -34,11 +34,47 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
+        // Migration: convert old single-API-key format to multi-box-office
+        (() => {
+            if (localStorage.getItem('boxOffices')) return; // already migrated
+
+            const oldKey = localStorage.getItem('ticketTailorApiKey');
+            if (oldKey) {
+                const boId = 'bo_' + Date.now();
+                const boxOffices = {
+                    [boId]: {
+                        id: boId,
+                        name: 'Default Box Office',
+                        platform: 'tickettailor',
+                        apiKey: oldKey
+                    }
+                };
+                localStorage.setItem('boxOffices', JSON.stringify(boxOffices));
+
+                // Convert flat eventMappings to new format
+                const rawMappings = localStorage.getItem('eventMappings');
+                if (rawMappings) {
+                    const old = JSON.parse(rawMappings);
+                    const converted = {};
+                    for (const [k, v] of Object.entries(old)) {
+                        converted[k] = v ? { boxOfficeId: boId, eventId: v } : null;
+                    }
+                    localStorage.setItem('eventMappings', JSON.stringify(converted));
+                }
+
+                localStorage.removeItem('ticketTailorApiKey');
+            } else {
+                localStorage.setItem('boxOffices', JSON.stringify({}));
+            }
+        })();
+
         const IdeasForumsDashboard = () => {
             const [view, setView] = useState('overview');
             const [selectedEvent, setSelectedEvent] = useState(null);
-            const [apiKey, setApiKey] = useState(() => localStorage.getItem('ticketTailorApiKey') || '');
-            const [apiKeyInput, setApiKeyInput] = useState('');
+            const [boxOffices, setBoxOffices] = useState(() => {
+                const saved = localStorage.getItem('boxOffices');
+                return saved ? JSON.parse(saved) : {};
+            });
             const [lastSync, setLastSync] = useState(() => localStorage.getItem('lastSync') || null);
             const [isSyncing, setIsSyncing] = useState(false);
             const [syncError, setSyncError] = useState(null);
@@ -51,20 +87,25 @@
             const chartRef = useRef(null);
             const chartInstance = useRef(null);
 
-            // Event mappings
+            // Event mappings - new format: { eventKey: { boxOfficeId, eventId } | null }
             const [eventMappings, setEventMappings] = useState(() => {
                 const saved = localStorage.getItem('eventMappings');
                 return saved ? JSON.parse(saved) : {
-                    ideasFest: '',
-                    uksuaRegionals: '',
-                    uksuaNationals: '',
-                    gbea: '',
-                    gbia: '',
-                    fgi: ''
+                    ideasFest: null,
+                    uksuaRegionals: null,
+                    uksuaNationals: null,
+                    gbea: null,
+                    gbia: null,
+                    fgi: null
                 };
             });
-            
-            const [ticketTailorEvents, setTicketTailorEvents] = useState([]);
+
+            // Events fetched per box office: { boId: [event, ...] }
+            const [ttEventsByBoxOffice, setTtEventsByBoxOffice] = useState({});
+
+            // Add box office form state
+            const [newBoName, setNewBoName] = useState('');
+            const [newBoKey, setNewBoKey] = useState('');
             
             // Monthly actuals
             const [monthlyActuals, setMonthlyActuals] = useState(() => {
@@ -181,11 +222,11 @@
                 localStorage.setItem('proxyUrl', proxyUrl);
             }, [proxyUrl]);
 
-            const saveApiKey = () => {
-                localStorage.setItem('ticketTailorApiKey', apiKeyInput);
-                setApiKey(apiKeyInput);
-                setApiKeyInput('');
-            };
+            useEffect(() => {
+                localStorage.setItem('boxOffices', JSON.stringify(boxOffices));
+            }, [boxOffices]);
+
+            const hasAnyBoxOffice = Object.keys(boxOffices).length > 0;
 
             const resetTargets = () => {
                 if (confirm('Reset all targets to default values? This cannot be undone.')) {
@@ -203,15 +244,15 @@
                 });
             };
 
-            const makeApiRequest = async (endpoint) => {
-                if (!apiKey) throw new Error('No API key configured');
+            const makeApiRequest = async (endpoint, apiKeyForRequest) => {
+                if (!apiKeyForRequest) throw new Error('No API key provided for this request');
 
                 let url;
                 const headers = {
                     'Accept': 'application/json'
                 };
 
-                const authString = btoa(apiKey + ':');
+                const authString = btoa(apiKeyForRequest + ':');
                 headers['Authorization'] = 'Basic ' + authString;
 
                 if (useProxy) {
@@ -260,23 +301,23 @@
                 }
             };
 
-            const fetchTicketTailorEvents = async () => {
-                if (!apiKey) {
-                    setSyncError('Please configure your API key first');
-                    return;
-                }
-                
+            const fetchEventsForBoxOffice = async (boxOfficeId) => {
+                const bo = boxOffices[boxOfficeId];
+                if (!bo) return;
+
                 try {
-                    setSyncError(null);
-                    const data = await makeApiRequest('events');
-                    setTicketTailorEvents(data.data || []);
+                    const data = await makeApiRequest('events', bo.apiKey);
+                    setTtEventsByBoxOffice(prev => ({
+                        ...prev,
+                        [boxOfficeId]: data.data || []
+                    }));
                     if (!data.data || data.data.length === 0) {
-                        setSyncError('No events found in your Ticket Tailor account');
+                        setSyncError(`No events found in "${bo.name}"`);
                     }
                 } catch (error) {
-                    console.error('Error fetching Ticket Tailor events:', error);
-                    let errorMessage = 'Failed to fetch events from Ticket Tailor. ';
-                    
+                    console.error(`Error fetching events for ${bo.name}:`, error);
+                    let errorMessage = `Failed to fetch events from "${bo.name}". `;
+
                     if (error.message.includes('CORS')) {
                         errorMessage += 'CORS error detected. Try enabling the CORS proxy in Settings.';
                     } else if (error.message.includes('401')) {
@@ -286,24 +327,30 @@
                     } else {
                         errorMessage += error.message;
                     }
-                    
+
                     setSyncError(errorMessage);
+                }
+            };
+
+            const fetchAllBoxOfficeEvents = async () => {
+                for (const boId of Object.keys(boxOffices)) {
+                    await fetchEventsForBoxOffice(boId);
                 }
             };
 
             const syncTicketData = async () => {
                 console.log('🔄 Sync button clicked');
-                console.log('API Key present:', !!apiKey);
+                console.log('Box offices:', Object.keys(boxOffices).length);
                 console.log('Event mappings:', eventMappings);
 
-                if (!apiKey) {
-                    console.error('❌ No API key configured');
-                    setSyncError('Please configure your Ticket Tailor API key first');
+                if (!hasAnyBoxOffice) {
+                    console.error('❌ No box offices configured');
+                    setSyncError('Please add a box office in Settings first');
                     return;
                 }
 
                 // Check if any events are mapped
-                const mappedEvents = Object.entries(eventMappings).filter(([_, id]) => id);
+                const mappedEvents = Object.entries(eventMappings).filter(([_, m]) => m && m.eventId);
                 console.log('Mapped events count:', mappedEvents.length);
 
                 if (mappedEvents.length === 0) {
@@ -321,16 +368,21 @@
                     let successCount = 0;
                     let errorDetails = [];
 
-                    for (const [eventKey, ttEventId] of Object.entries(eventMappings)) {
-                        if (!ttEventId) continue;
+                    for (const [eventKey, mapping] of mappedEvents) {
+                        const bo = boxOffices[mapping.boxOfficeId];
+                        if (!bo) {
+                            errorDetails.push(`${eventKey}: box office not found`);
+                            continue;
+                        }
+                        const ttEventId = mapping.eventId;
 
-                        console.log(`📊 Syncing ${eventKey} (ID: ${ttEventId})`);
+                        console.log(`📊 Syncing ${eventKey} via "${bo.name}" (ID: ${ttEventId})`);
 
                         try {
                             // Fetch issued tickets
                             try {
                                 console.log(`  → Fetching tickets for ${eventKey}...`);
-                                const ticketsData = await makeApiRequest(`issued_tickets?event_id=${ttEventId}`);
+                                const ticketsData = await makeApiRequest(`issued_tickets?event_id=${ttEventId}`, bo.apiKey);
                                 const ticketCount = ticketsData.data?.length || 0;
                                 console.log(`  ✓ Got ${ticketCount} tickets for ${eventKey}`);
 
@@ -339,13 +391,13 @@
                                 }
                             } catch (ticketsError) {
                                 console.error(`  ✗ Error fetching tickets for ${eventKey}:`, ticketsError);
-                                errorDetails.push(`${eventKey} tickets: ${ticketsError.message}`);
+                                errorDetails.push(`${eventKey} tickets (${bo.name}): ${ticketsError.message}`);
                             }
 
                             // Fetch orders for revenue
                             try {
                                 console.log(`  → Fetching orders for ${eventKey}...`);
-                                const ordersData = await makeApiRequest(`orders?event_id=${ttEventId}`);
+                                const ordersData = await makeApiRequest(`orders?event_id=${ttEventId}`, bo.apiKey);
                                 const totalRevenue = ordersData.data?.reduce((sum, order) => {
                                     return sum + (order.total || 0);
                                 }, 0) || 0;
@@ -356,20 +408,20 @@
                                 }
                             } catch (ordersError) {
                                 console.error(`  ✗ Error fetching orders for ${eventKey}:`, ordersError);
-                                errorDetails.push(`${eventKey} orders: ${ordersError.message}`);
+                                errorDetails.push(`${eventKey} orders (${bo.name}): ${ordersError.message}`);
                             }
 
                             successCount++;
                         } catch (error) {
                             console.error(`❌ Error fetching data for ${eventKey}:`, error);
-                            errorDetails.push(`${eventKey}: ${error.message}`);
+                            errorDetails.push(`${eventKey} (${bo.name}): ${error.message}`);
                         }
                     }
 
                     console.log(`✅ Successfully synced ${successCount} events`);
 
                     if (successCount === 0) {
-                        const errorMsg = 'Failed to sync any events. ' + (errorDetails.length > 0 ? errorDetails.join('; ') : 'Please check your event mappings and API key permissions.');
+                        const errorMsg = 'Failed to sync any events. ' + (errorDetails.length > 0 ? errorDetails.join('; ') : 'Please check your event mappings and box office API keys.');
                         throw new Error(errorMsg);
                     }
 
@@ -395,10 +447,10 @@
             };
 
             useEffect(() => {
-                if (apiKey && view === 'settings') {
-                    fetchTicketTailorEvents();
+                if (hasAnyBoxOffice && view === 'settings') {
+                    fetchAllBoxOfficeEvents();
                 }
-            }, [apiKey, view, useProxy, proxyUrl]);
+            }, [hasAnyBoxOffice, view, useProxy, proxyUrl]);
 
             // Chart rendering
             useEffect(() => {
@@ -542,11 +594,11 @@
                                     )}
                                     <button
                                         onClick={syncTicketData}
-                                        disabled={isSyncing || !apiKey}
+                                        disabled={isSyncing || !hasAnyBoxOffice}
                                         className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                                            isSyncing 
-                                                ? 'bg-purple-300 cursor-not-allowed' 
-                                                : apiKey 
+                                            isSyncing
+                                                ? 'bg-purple-300 cursor-not-allowed'
+                                                : hasAnyBoxOffice
                                                     ? 'bg-white text-purple-600 hover:bg-purple-50'
                                                     : 'bg-gray-300 cursor-not-allowed'
                                         }`}
@@ -919,61 +971,134 @@
 
                         {view === 'settings' && (
                             <div className="space-y-6">
-                                {/* API Key Configuration */}
+                                {/* Box Offices Management */}
                                 <div className="bg-white rounded-lg shadow p-6">
-                                    <h3 className="font-bold text-lg mb-4">Ticket Tailor API Configuration</h3>
-                                    
-                                    {!apiKey ? (
-                                        <div>
-                                            <p className="text-gray-600 mb-4">
-                                                Enter your Ticket Tailor API key to enable automatic ticket syncing.
-                                                <a href="https://help.tickettailor.com/en/articles/4593218-how-do-i-connect-to-the-ticket-tailor-api" 
-                                                   target="_blank" 
-                                                   className="text-blue-600 hover:underline ml-2">
-                                                    How to get your API key →
-                                                </a>
-                                            </p>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="password"
-                                                    value={apiKeyInput}
-                                                    onChange={(e) => setApiKeyInput(e.target.value)}
-                                                    placeholder="sk_xxxx_xxxx_xxxxxxxxxx"
-                                                    className="flex-1 px-4 py-2 border rounded-lg"
-                                                />
-                                                <button
-                                                    onClick={saveApiKey}
-                                                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                                                >
-                                                    Save
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <div className="flex items-center justify-between mb-4">
-                                                <p className="text-green-600">✓ API key configured</p>
-                                                <button
-                                                    onClick={() => {
-                                                        localStorage.removeItem('ticketTailorApiKey');
-                                                        setApiKey('');
-                                                    }}
-                                                    className="text-red-600 hover:underline"
-                                                >
-                                                    Remove API key
-                                                </button>
-                                            </div>
+                                    <h3 className="font-bold text-lg mb-4">Box Offices</h3>
+                                    <p className="text-gray-600 mb-4">
+                                        Add your Ticket Tailor box office accounts. Each account has its own API key.
+                                        <a href="https://help.tickettailor.com/en/articles/4593218-how-do-i-connect-to-the-ticket-tailor-api"
+                                           target="_blank"
+                                           className="text-blue-600 hover:underline ml-2">
+                                            How to get your API key
+                                        </a>
+                                    </p>
+
+                                    {/* Existing box offices list */}
+                                    {Object.values(boxOffices).length > 0 && (
+                                        <div className="space-y-3 mb-6">
+                                            {Object.values(boxOffices).map(bo => {
+                                                const mappedCount = Object.values(eventMappings).filter(m => m && m.boxOfficeId === bo.id).length;
+                                                return (
+                                                    <div key={bo.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                                                        <div>
+                                                            <div className="font-semibold">{bo.name}</div>
+                                                            <div className="text-sm text-gray-500">
+                                                                Key: {bo.apiKey.substring(0, 8)}...{bo.apiKey.slice(-4)} | {mappedCount} event{mappedCount !== 1 ? 's' : ''} mapped
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        setSyncError(null);
+                                                                        await makeApiRequest('events', bo.apiKey);
+                                                                        alert(`Connection to "${bo.name}" successful!`);
+                                                                    } catch (e) {
+                                                                        alert(`Connection failed: ${e.message}`);
+                                                                    }
+                                                                }}
+                                                                className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                                            >
+                                                                Test
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (confirm(`Delete "${bo.name}"? Events mapped to this box office will be unmapped.`)) {
+                                                                        const updated = { ...boxOffices };
+                                                                        delete updated[bo.id];
+                                                                        setBoxOffices(updated);
+                                                                        // Unmap any events pointing to this box office
+                                                                        const newMappings = { ...eventMappings };
+                                                                        for (const [k, m] of Object.entries(newMappings)) {
+                                                                            if (m && m.boxOfficeId === bo.id) {
+                                                                                newMappings[k] = null;
+                                                                            }
+                                                                        }
+                                                                        setEventMappings(newMappings);
+                                                                        setTtEventsByBoxOffice(prev => {
+                                                                            const copy = { ...prev };
+                                                                            delete copy[bo.id];
+                                                                            return copy;
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
+
+                                    {/* Add new box office form */}
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                                        <h4 className="font-medium mb-3">Add New Box Office</h4>
+                                        <div className="flex gap-2 items-end">
+                                            <div className="flex-1">
+                                                <label className="block text-sm text-gray-600 mb-1">Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={newBoName}
+                                                    onChange={(e) => setNewBoName(e.target.value)}
+                                                    placeholder="e.g. Ideas Fest Box Office"
+                                                    className="w-full px-3 py-2 border rounded-lg"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block text-sm text-gray-600 mb-1">API Key</label>
+                                                <input
+                                                    type="password"
+                                                    value={newBoKey}
+                                                    onChange={(e) => setNewBoKey(e.target.value)}
+                                                    placeholder="sk_xxxx_xxxx_xxxxxxxxxx"
+                                                    className="w-full px-3 py-2 border rounded-lg"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    if (!newBoName.trim() || !newBoKey.trim()) return;
+                                                    const id = 'bo_' + Date.now();
+                                                    setBoxOffices({
+                                                        ...boxOffices,
+                                                        [id]: {
+                                                            id,
+                                                            name: newBoName.trim(),
+                                                            platform: 'tickettailor',
+                                                            apiKey: newBoKey.trim()
+                                                        }
+                                                    });
+                                                    setNewBoName('');
+                                                    setNewBoKey('');
+                                                }}
+                                                disabled={!newBoName.trim() || !newBoKey.trim()}
+                                                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* CORS Proxy Settings */}
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                                    <h3 className="font-bold text-lg mb-4">🔧 Connection Settings</h3>
+                                    <h3 className="font-bold text-lg mb-4">Connection Settings</h3>
                                     <p className="text-gray-700 mb-4">
                                         If you're getting CORS errors, enable the proxy below.
                                     </p>
-                                    
+
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
                                             <input
@@ -987,7 +1112,7 @@
                                                 Use CORS Proxy
                                             </label>
                                         </div>
-                                        
+
                                         {useProxy && (
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -998,39 +1123,47 @@
                                                     onChange={(e) => setProxyUrl(e.target.value)}
                                                     className="w-full px-4 py-2 border rounded-lg"
                                                 >
-                                                    <option value="vercel">Vercel Serverless (Recommended) ✓</option>
+                                                    <option value="vercel">Vercel Serverless (Recommended)</option>
                                                     <option value="https://corsproxy.io/?">corsproxy.io (May not work)</option>
                                                     <option value="https://api.allorigins.win/raw?url=">allorigins.win (May not work)</option>
                                                 </select>
                                                 <p className="text-xs text-gray-600 mt-2">
-                                                    ⚠️ Public CORS proxies don't support Authorization headers. Use Vercel Serverless for best results.
+                                                    Public CORS proxies don't support Authorization headers. Use Vercel Serverless for best results.
                                                 </p>
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Debug Panel */}
-                                {apiKey && (
+                                {/* Diagnostic Panel */}
+                                {hasAnyBoxOffice && (
                                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                                        <h3 className="font-bold text-lg mb-4">🔍 Configuration Status</h3>
+                                        <h3 className="font-bold text-lg mb-4">Configuration Status</h3>
                                         <div className="space-y-2 text-sm">
                                             <div className="flex justify-between">
-                                                <span>API Key:</span>
-                                                <span className="font-semibold text-green-600">✓ Configured</span>
+                                                <span>Box Offices:</span>
+                                                <span className="font-semibold text-green-600">
+                                                    {Object.keys(boxOffices).length} configured ({Object.values(boxOffices).map(b => b.name).join(', ')})
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>CORS Proxy:</span>
                                                 <span className="font-semibold">
-                                                    {useProxy ? `✓ Enabled (${proxyUrl === 'vercel' ? 'Vercel Serverless' : proxyUrl})` : '✗ Disabled'}
+                                                    {useProxy ? `Enabled (${proxyUrl === 'vercel' ? 'Vercel Serverless' : proxyUrl})` : 'Disabled'}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span>Events Mapped:</span>
                                                 <span className="font-semibold">
-                                                    {Object.values(eventMappings).filter(id => id).length} / 6
+                                                    {Object.values(eventMappings).filter(m => m && m.eventId).length} / 6
                                                 </span>
                                             </div>
+                                            {Object.entries(eventMappings).filter(([_, m]) => m && m.eventId).map(([eventKey, m]) => (
+                                                <div key={eventKey} className="flex justify-between pl-4 text-gray-600">
+                                                    <span>{eventLabels[eventKey]}:</span>
+                                                    <span>{boxOffices[m.boxOfficeId]?.name || 'Unknown'} / {m.eventId}</span>
+                                                </div>
+                                            ))}
                                             <div className="flex justify-between">
                                                 <span>Last Sync:</span>
                                                 <span className="font-semibold">
@@ -1041,63 +1174,100 @@
                                         <button
                                             onClick={() => {
                                                 console.log('=== DIAGNOSTIC INFO ===');
-                                                console.log('API Key configured:', !!apiKey);
-                                                console.log('API Key (first 10 chars):', apiKey ? apiKey.substring(0, 10) + '...' : 'none');
+                                                console.log('Box Offices:', boxOffices);
                                                 console.log('Use Proxy:', useProxy);
                                                 console.log('Proxy URL:', proxyUrl);
                                                 console.log('Event Mappings:', eventMappings);
+                                                console.log('TT Events by Box Office:', ttEventsByBoxOffice);
                                                 console.log('Actuals:', actuals);
                                                 console.log('Last Sync:', lastSync);
                                                 alert('Diagnostic info logged to console. Press F12 to view.');
                                             }}
                                             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 w-full"
                                         >
-                                            📋 View Full Diagnostic Info
+                                            View Full Diagnostic Info
                                         </button>
                                     </div>
                                 )}
 
                                 {/* Event Mappings */}
-                                {apiKey && (
+                                {hasAnyBoxOffice && (
                                     <div className="bg-white rounded-lg shadow p-6">
                                         <h3 className="font-bold text-lg mb-4">Event Mappings</h3>
                                         <p className="text-gray-600 mb-4">
-                                            Map your Ticket Tailor events to Ideas Forums programs.
+                                            Map your Ticket Tailor events to Ideas Forums programs. Select a box office first, then choose the event.
                                         </p>
 
-                                        <button
-                                            onClick={fetchTicketTailorEvents}
-                                            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                        >
-                                            Refresh Events List
-                                        </button>
+                                        <div className="flex gap-2 mb-4">
+                                            {Object.values(boxOffices).map(bo => (
+                                                <button
+                                                    key={bo.id}
+                                                    onClick={() => fetchEventsForBoxOffice(bo.id)}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                                                >
+                                                    Refresh "{bo.name}" Events
+                                                </button>
+                                            ))}
+                                        </div>
 
-                                        {ticketTailorEvents.length > 0 ? (
-                                            <div className="space-y-4">
-                                                {['ideasFest', 'uksuaRegionals', 'uksuaNationals', 'gbea', 'gbia', 'fgi'].map(eventKey => (
-                                                    <div key={eventKey} className="flex items-center gap-4">
-                                                        <label className="w-64 font-medium">{eventLabels[eventKey]}:</label>
+                                        <div className="space-y-4">
+                                            {['ideasFest', 'uksuaRegionals', 'uksuaNationals', 'gbea', 'gbia', 'fgi'].map(eventKey => {
+                                                const mapping = eventMappings[eventKey];
+                                                const selectedBoId = mapping?.boxOfficeId || '';
+                                                const selectedEventId = mapping?.eventId || '';
+                                                const eventsForBo = selectedBoId ? (ttEventsByBoxOffice[selectedBoId] || []) : [];
+
+                                                return (
+                                                    <div key={eventKey} className="flex items-center gap-3">
+                                                        <label className="w-52 font-medium text-sm">{eventLabels[eventKey]}:</label>
                                                         <select
-                                                            value={eventMappings[eventKey] || ''}
-                                                            onChange={(e) => setEventMappings({
-                                                                ...eventMappings,
-                                                                [eventKey]: e.target.value
-                                                            })}
-                                                            className="flex-1 px-4 py-2 border rounded-lg"
+                                                            value={selectedBoId}
+                                                            onChange={(e) => {
+                                                                const boId = e.target.value;
+                                                                setEventMappings({
+                                                                    ...eventMappings,
+                                                                    [eventKey]: boId ? { boxOfficeId: boId, eventId: '' } : null
+                                                                });
+                                                                // Auto-fetch events if we haven't yet
+                                                                if (boId && !ttEventsByBoxOffice[boId]) {
+                                                                    fetchEventsForBoxOffice(boId);
+                                                                }
+                                                            }}
+                                                            className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                                                        >
+                                                            <option value="">-- Box Office --</option>
+                                                            {Object.values(boxOffices).map(bo => (
+                                                                <option key={bo.id} value={bo.id}>{bo.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <select
+                                                            value={selectedEventId}
+                                                            onChange={(e) => {
+                                                                setEventMappings({
+                                                                    ...eventMappings,
+                                                                    [eventKey]: e.target.value
+                                                                        ? { boxOfficeId: selectedBoId, eventId: e.target.value }
+                                                                        : null
+                                                                });
+                                                            }}
+                                                            disabled={!selectedBoId}
+                                                            className="flex-1 px-3 py-2 border rounded-lg text-sm disabled:bg-gray-100"
                                                         >
                                                             <option value="">-- Select Event --</option>
-                                                            {ticketTailorEvents.map(event => (
+                                                            {eventsForBo.map(event => (
                                                                 <option key={event.id} value={event.id}>
                                                                     {event.name}
                                                                 </option>
                                                             ))}
                                                         </select>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-gray-500 italic">
-                                                Click "Refresh Events List" to load events
+                                                );
+                                            })}
+                                        </div>
+
+                                        {Object.values(ttEventsByBoxOffice).every(arr => arr.length === 0) && Object.keys(ttEventsByBoxOffice).length === 0 && (
+                                            <div className="text-gray-500 italic mt-4">
+                                                Click a "Refresh" button above to load events from your box offices
                                             </div>
                                         )}
                                     </div>
