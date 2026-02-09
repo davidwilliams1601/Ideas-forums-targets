@@ -308,11 +308,12 @@
                 while (nextEndpoint) {
                     const data = await makeApiRequest(nextEndpoint, apiKeyForRequest);
                     if (data.data) allItems = allItems.concat(data.data);
-                    // TT API returns links.next as a full URL; extract the path after /v1/
+                    console.log(`  … fetched ${data.data?.length || 0} items (${allItems.length} total so far)`);
+                    // TT API returns links.next as a relative path e.g. "/issued_tickets?starting_after=it_123"
                     const nextUrl = data.links?.next;
                     if (nextUrl) {
-                        const match = nextUrl.match(/\/v1\/(.+)/);
-                        nextEndpoint = match ? match[1] : null;
+                        // Strip leading slash to get bare endpoint path
+                        nextEndpoint = nextUrl.replace(/^\//, '');
                     } else {
                         nextEndpoint = null;
                     }
