@@ -301,6 +301,25 @@
                 }
             };
 
+            // Fetch all pages from a paginated TT API endpoint
+            const fetchAllPages = async (endpoint, apiKeyForRequest) => {
+                let allItems = [];
+                let nextEndpoint = endpoint;
+                while (nextEndpoint) {
+                    const data = await makeApiRequest(nextEndpoint, apiKeyForRequest);
+                    if (data.data) allItems = allItems.concat(data.data);
+                    // TT API returns links.next as a full URL; extract the path after /v1/
+                    const nextUrl = data.links?.next;
+                    if (nextUrl) {
+                        const match = nextUrl.match(/\/v1\/(.+)/);
+                        nextEndpoint = match ? match[1] : null;
+                    } else {
+                        nextEndpoint = null;
+                    }
+                }
+                return allItems;
+            };
+
             const fetchEventsForBoxOffice = async (boxOfficeId) => {
                 const bo = boxOffices[boxOfficeId];
                 if (!bo) return;
@@ -379,29 +398,28 @@
                         console.log(`📊 Syncing ${eventKey} via "${bo.name}" (ID: ${ttEventId})`);
 
                         try {
-                            // Fetch issued tickets
+                            // Fetch all issued tickets (paginated)
                             try {
                                 console.log(`  → Fetching tickets for ${eventKey}...`);
-                                const ticketsData = await makeApiRequest(`issued_tickets?event_id=${ttEventId}`, bo.apiKey);
-                                const ticketCount = ticketsData.data?.length || 0;
-                                console.log(`  ✓ Got ${ticketCount} tickets for ${eventKey}`);
+                                const allTickets = await fetchAllPages(`issued_tickets?event_id=${ttEventId}`, bo.apiKey);
+                                console.log(`  ✓ Got ${allTickets.length} tickets for ${eventKey}`);
 
                                 if (newActuals[eventKey]) {
-                                    newActuals[eventKey].tickets = ticketCount;
+                                    newActuals[eventKey].tickets = allTickets.length;
                                 }
                             } catch (ticketsError) {
                                 console.error(`  ✗ Error fetching tickets for ${eventKey}:`, ticketsError);
                                 errorDetails.push(`${eventKey} tickets (${bo.name}): ${ticketsError.message}`);
                             }
 
-                            // Fetch orders for revenue
+                            // Fetch all orders for revenue (paginated)
                             try {
                                 console.log(`  → Fetching orders for ${eventKey}...`);
-                                const ordersData = await makeApiRequest(`orders?event_id=${ttEventId}`, bo.apiKey);
-                                const totalRevenue = ordersData.data?.reduce((sum, order) => {
+                                const allOrders = await fetchAllPages(`orders?event_id=${ttEventId}`, bo.apiKey);
+                                const totalRevenue = allOrders.reduce((sum, order) => {
                                     return sum + (order.total || 0);
-                                }, 0) || 0;
-                                console.log(`  ✓ Got revenue £${(totalRevenue/100).toFixed(2)} for ${eventKey}`);
+                                }, 0);
+                                console.log(`  ✓ Got revenue £${(totalRevenue/100).toFixed(2)} from ${allOrders.length} orders for ${eventKey}`);
 
                                 if (newActuals[eventKey]) {
                                     newActuals[eventKey].revenue = totalRevenue / 100;
