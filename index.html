@@ -303,21 +303,40 @@
 
             // Fetch all pages from a paginated TT API endpoint
             const fetchAllPages = async (endpoint, apiKeyForRequest) => {
+                const PAGE_SIZE = 100;
                 let allItems = [];
                 let nextEndpoint = endpoint;
+                let pageNum = 1;
                 while (nextEndpoint) {
                     const data = await makeApiRequest(nextEndpoint, apiKeyForRequest);
-                    if (data.data) allItems = allItems.concat(data.data);
-                    console.log(`  … fetched ${data.data?.length || 0} items (${allItems.length} total so far)`);
-                    // TT API returns links.next as a relative path e.g. "/issued_tickets?starting_after=it_123"
+                    const pageItems = data.data || [];
+                    allItems = allItems.concat(pageItems);
+                    console.log(`  page ${pageNum}: got ${pageItems.length} items (${allItems.length} total)`);
+                    console.log(`  links:`, JSON.stringify(data.links));
+
+                    // Try links.next first
                     const nextUrl = data.links?.next;
                     if (nextUrl) {
-                        // Strip leading slash to get bare endpoint path
                         nextEndpoint = nextUrl.replace(/^\//, '');
+                        console.log(`  next page via links.next: ${nextEndpoint}`);
+                    } else if (pageItems.length >= PAGE_SIZE) {
+                        // Fallback: manual cursor pagination using last item's ID
+                        const lastId = pageItems[pageItems.length - 1]?.id;
+                        if (lastId) {
+                            // Preserve the base endpoint path and original query params
+                            const baseEndpoint = endpoint.split('?')[0];
+                            const origParams = endpoint.includes('?') ? '&' + endpoint.split('?')[1] : '';
+                            nextEndpoint = `${baseEndpoint}?starting_after=${lastId}${origParams}`;
+                            console.log(`  next page via cursor fallback: ${nextEndpoint}`);
+                        } else {
+                            nextEndpoint = null;
+                        }
                     } else {
                         nextEndpoint = null;
                     }
+                    pageNum++;
                 }
+                console.log(`  pagination complete: ${allItems.length} total items`);
                 return allItems;
             };
 
